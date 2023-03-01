@@ -47,7 +47,7 @@ def ode(dist_sqrt, prior_sqrt, obs, rv, obs_mdl, dt):
     def _ode_fcn(t, x, rv, d):
         mu, sigma_sqrt = _unravel_fcn(x)
 
-        z = mu + jnp.einsum("kh,nk->nh", sigma_sqrt, rv)
+        z = mu + jnp.einsum("kh,nh->nk", sigma_sqrt, rv)
         dV = jax.vmap(gradV, in_axes=(0, None, None, None))(z, obs, prior_sqrt, obs_mdl)
 
         sigma_dt = 2.0 * jnp.eye(d)\
@@ -105,7 +105,7 @@ def wasserstein_filter_sqrt(observations, random_vector,
 
         # ell
         mu, sigma_sqrt = xp
-        z = mu + jnp.einsum("kh,nk->nh", sigma_sqrt, q)
+        z = mu + jnp.einsum("kh,nh->nk", sigma_sqrt, q)
         log_wn = jax.vmap(_ell, in_axes=(0, None, None))(z, y, observation_model)
         ell += logsumexp(log_wn) - jnp.log(q.shape[0])
 

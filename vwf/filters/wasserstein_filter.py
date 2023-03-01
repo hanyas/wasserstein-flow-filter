@@ -45,7 +45,7 @@ def ode(dist, prior, obs, rv, obs_mdl, dt):
     def _ode_fcn(t, x, rv, d):
         mu, sigma = _unravel_fcn(x)
 
-        z = mu + jnp.einsum("kh,nk->nh", jnp.linalg.cholesky(sigma), rv)
+        z = mu + jnp.einsum("kh,nh->nk", jnp.linalg.cholesky(sigma), rv)
         dV = jax.vmap(gradV, in_axes=(0, None, None, None))(z, obs, prior, obs_mdl)
 
         mu_dt = - jnp.mean(dV, axis=0)
@@ -99,7 +99,7 @@ def wasserstein_filter(observations, random_vector,
 
         # ell
         mu, sigma = xp
-        z = mu + jnp.einsum("kh,nk->nh", jnp.linalg.cholesky(sigma), q)
+        z = mu + jnp.einsum("kh,nh->nk", jnp.linalg.cholesky(sigma), q)
         log_wn = jax.vmap(_ell, in_axes=(0, None, None))(z, y, observation_model)
         ell += logsumexp(log_wn) - jnp.log(q.shape[0])
 

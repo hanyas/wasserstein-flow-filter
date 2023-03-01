@@ -8,7 +8,6 @@ from vwf.objects import MVNSqrt
 from vwf.filters import wasserstein_filter_sqrt
 from vwf.models.markov_sv_sqrt import build_model, generate_data
 
-
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 
