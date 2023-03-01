@@ -18,9 +18,9 @@ def kullback_leibler(i: int, q: MVNStandard, p: MVNStandard):
 
     X_inv = jnp.linalg.inv(X)
     return (
-        jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
-        + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
-        + (logdet(X) - logdet(Y)) / 2.0
+            jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
+            + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
+            + (logdet(X) - logdet(Y)) / 2.0
     ) > 1e-8
 
 
@@ -34,11 +34,35 @@ def kullback_leibler_sqrt(i: int, q: MVNSqrt, p: MVNSqrt):
     X_inv = X_sqrt_inv.T @ X_sqrt_inv
     Y = Y_sqrt @ Y_sqrt.T
     return (
-        jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
-        + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
-        + jnp.sum(jnp.log(jnp.diag(X_sqrt)))
-        - jnp.sum(jnp.log(jnp.diag(Y_sqrt)))
+            jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
+            + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
+            + jnp.sum(jnp.log(jnp.diag(X_sqrt)))
+            - jnp.sum(jnp.log(jnp.diag(Y_sqrt)))
     ) > 1e-8
+
+
+def wasserstein_mvn(q: MVNStandard, p: MVNStandard):
+    x, X = q
+    y, Y = p
+
+    sqrt_X, sqrt_Y = jnp.linalg.cholesky(X), jnp.linalg.cholesky(Y)
+    tmp = jnp.linalg.cholesky(sqrt_X @ Y @ sqrt_X)
+
+    out = jnp.sum(jnp.square(x - y)) + jnp.trace(X + Y - 2 * tmp)
+    return out ** 0.5
+
+
+def wasserstein_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
+    x, X_sqrt = q
+    y, Y_sqrt = p
+
+    X = X_sqrt @ X_sqrt.T
+    Y = Y_sqrt @ Y_sqrt.T
+    sqrt_X, sqrt_Y = jnp.linalg.cholesky(X), jnp.linalg.cholesky(Y)
+    tmp = jnp.linalg.cholesky(sqrt_X @ Y @ sqrt_X)
+
+    out = jnp.sum(jnp.square(x - y)) + jnp.trace(X + Y - 2 * tmp)
+    return out ** 0.5
 
 
 def rk4(func, tk, yk, dt=0.01, **kwargs):
