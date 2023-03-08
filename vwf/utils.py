@@ -31,9 +31,9 @@ def wasserstein(q: MVNStandard, p: MVNStandard):
     y, Y = p
 
     from jax.scipy.linalg import sqrtm
-    return (
-        jnp.linalg.norm(x - y) ** 2
-        + jnp.trace(X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y)))
+
+    return jnp.linalg.norm(x - y) ** 2 + jnp.trace(
+        X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y))
     )
 
 
@@ -45,9 +45,9 @@ def wasserstein_sqrt(q: MVNSqrt, p: MVNSqrt):
     Y = Y_sqrt @ Y_sqrt.T
 
     from jax.scipy.linalg import sqrtm
-    return (
-        jnp.linalg.norm(x - y) ** 2
-        + jnp.trace(X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y)))
+
+    return jnp.linalg.norm(x - y) ** 2 + jnp.trace(
+        X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y))
     )
 
 
@@ -161,7 +161,7 @@ def tria_qr(A):
 @jax.custom_jvp
 def qr(A: jnp.ndarray):
     """The JAX provided implementation is not parallelizable using VMAP.
-     As a consequence, we have to rewrite it..."""
+    As a consequence, we have to rewrite it..."""
     return _qr(A)
 
 
