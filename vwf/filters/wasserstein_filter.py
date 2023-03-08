@@ -10,7 +10,7 @@ from jax.scipy.stats import multivariate_normal as mvn
 
 from vwf.objects import MVNStandard, ConditionalModel
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
-from vwf.utils import kullback_leibler_cond, wasserstein_cond
+from vwf.utils import kullback_leibler_mvn_cond, wasserstein_mvn_cond
 
 
 def linearize(model: ConditionalModel, x: MVNStandard):
@@ -105,7 +105,7 @@ def wasserstein_filter(
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
-    stopping_criterion: Callable = kullback_leibler_cond,
+    stopping_criterion: Callable = kullback_leibler_mvn_cond,
 ):
     def _cond_log_pdf(x, y, obs_mdl):
         mean_fcn, cov_fcn = obs_mdl

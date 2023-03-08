@@ -10,23 +10,23 @@ from vwf.objects import MVNStandard, MVNSqrt
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
-def wasserstein_cond(i, q, p):
-    return wasserstein(q, p) > 1e-8
+def wasserstein_mvn_cond(i, q, p):
+    return wasserstein_mvn(q, p) > 1e-8
 
 
-def wasserstein_sqrt_cond(i, q, p):
-    return wasserstein_sqrt(q, p) > 1e-8
+def wasserstein_mvn_sqrt_cond(i, q, p):
+    return wasserstein_mvn_sqrt(q, p) > 1e-8
 
 
-def kullback_leibler_cond(i, q, p):
-    return kullback_leibler(q, p) > 1e-8
+def kullback_leibler_mvn_cond(i, q, p):
+    return kullback_leibler_mvn(q, p) > 1e-8
 
 
-def kullback_leibler_sqrt_cond(i, q, p):
-    return kullback_leibler_sqrt(q, p) > 1e-8
+def kullback_leibler_mvn_sqrt_cond(i, q, p):
+    return kullback_leibler_mvn_sqrt(q, p) > 1e-8
 
 
-def wasserstein(q: MVNStandard, p: MVNStandard):
+def wasserstein_mvn(q: MVNStandard, p: MVNStandard):
     x, X = q
     y, Y = p
 
@@ -37,7 +37,7 @@ def wasserstein(q: MVNStandard, p: MVNStandard):
     )
 
 
-def wasserstein_sqrt(q: MVNSqrt, p: MVNSqrt):
+def wasserstein_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
     x, X_sqrt = q
     y, Y_sqrt = p
 
@@ -51,7 +51,7 @@ def wasserstein_sqrt(q: MVNSqrt, p: MVNSqrt):
     )
 
 
-def kullback_leibler(q: MVNStandard, p: MVNStandard):
+def kullback_leibler_mvn(q: MVNStandard, p: MVNStandard):
     # KL(p || q)
     x, X = q
     y, Y = p
@@ -66,7 +66,7 @@ def kullback_leibler(q: MVNStandard, p: MVNStandard):
     )
 
 
-def kullback_leibler_sqrt(q: MVNSqrt, p: MVNSqrt):
+def kullback_leibler_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
     # KL(p || q)
     x, X_sqrt = q
     y, Y_sqrt = p

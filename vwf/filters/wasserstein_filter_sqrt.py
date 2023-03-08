@@ -11,7 +11,7 @@ from jax.experimental.ode import odeint
 
 from vwf.objects import MVNSqrt, ConditionalModelSqrt
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
-from vwf.utils import kullback_leibler_sqrt_cond, wasserstein_sqrt_cond
+from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from vwf.utils import tria_qr, tria_tril
 
 
@@ -120,7 +120,7 @@ def wasserstein_filter_sqrt(
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
-    stopping_criterion: Callable = kullback_leibler_sqrt_cond,
+    stopping_criterion: Callable = kullback_leibler_mvn_sqrt_cond,
 ):
     def _cond_log_pdf(x, y, obs_mdl):
         mean_fcn, cov_sqrt_fcn = obs_mdl
