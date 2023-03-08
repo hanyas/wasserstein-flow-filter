@@ -4,7 +4,9 @@ import jax.random
 import matplotlib.pyplot as plt
 
 from vwf.objects import MVNStandard
-from vwf.filters import non_markov_stratified_particle_filter as particle_filter
+from vwf.filters import (
+    non_markov_stratified_particle_filter as particle_filter,
+)
 from vwf.models.non_markov_sv import build_model, generate_data
 
 jax.config.update("jax_platform_name", "cpu")
@@ -28,18 +30,20 @@ true_params = jnp.array([mu, a, sig, rho])
 Xs, Ys = generate_data(sub_key, x0, T, true_params)
 
 trns_mdl, obs_mdl = build_model(true_params)
-Xf, ell, Ws = jax.jit(particle_filter,
-                      static_argnums=(1, 4, 5))(key, 250, Ys, x0,
-                                                trns_mdl, obs_mdl)
+Xf, ell, Ws = jax.jit(particle_filter, static_argnums=(1, 4, 5))(
+    key, 250, Ys, x0, trns_mdl, obs_mdl
+)
 print("Likelihood: ", ell)
 
 MEAN_PARTICLES = jnp.mean(Xf, axis=1)[:, 0]
-VAR_PARTICLES = jnp.average(Xf[..., 0] ** 2, axis=1, weights=Ws) - MEAN_PARTICLES ** 2
-STD_PARTICLES = VAR_PARTICLES ** 0.5
+VAR_PARTICLES = (
+    jnp.average(Xf[..., 0] ** 2, axis=1, weights=Ws) - MEAN_PARTICLES**2
+)
+STD_PARTICLES = VAR_PARTICLES**0.5
 
 plt.figure()
-plt.plot(Xs, 'k')
-plt.plot(MEAN_PARTICLES, 'r')
+plt.plot(Xs, "k")
+plt.plot(MEAN_PARTICLES, "r")
 # plt.fill_between(jnp.arange(T), MEAN_PARTICLES
 #                  - 2 * STD_PARTICLES, MEAN_PARTICLES + 2 * STD_PARTICLES,
 #                  color="tab:blue", alpha=0.5)

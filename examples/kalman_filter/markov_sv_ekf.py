@@ -34,8 +34,8 @@ Zf, ell = kalman_filter(Ys, z0, trns_mdl, obs_mdl)
 print("Likelihood: ", ell)
 
 plt.figure()
-plt.plot(Zs[1:, 0], 'k')
-plt.plot(Zf.mean[1:, 0], 'r')
+plt.plot(Zs[1:, 0], "k")
+plt.plot(Zf.mean[1:, 0], "r")
 plt.show()
 
 

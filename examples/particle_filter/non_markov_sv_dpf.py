@@ -20,8 +20,9 @@ from vwf.models.non_markov_sv import build_model, generate_data
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
-os.environ["XLA_FLAGS"] = ("--xla_cpu_multi_thread_eigen=false "
-                           "intra_op_parallelism_threads=1")
+os.environ["XLA_FLAGS"] = (
+    "--xla_cpu_multi_thread_eigen=false " "intra_op_parallelism_threads=1"
+)
 
 mu = 0.5
 a = 0.975
@@ -41,18 +42,20 @@ true_params = jnp.array([mu, a, sig, rho])
 Xs, Ys = generate_data(sub_key, x0, T, true_params)
 
 trns_mdl, obs_mdl = build_model(true_params)
-Xf, ell, Ws = jax.jit(particle_filter,
-                      static_argnums=(1, 4, 5))(key, 250, Ys, x0,
-                                                trns_mdl, obs_mdl)
+Xf, ell, Ws = jax.jit(particle_filter, static_argnums=(1, 4, 5))(
+    key, 250, Ys, x0, trns_mdl, obs_mdl
+)
 print("Likelihood: ", ell)
 
 MEAN_PARTICLES = jnp.mean(Xf, axis=1)[:, 0]
-VAR_PARTICLES = jnp.average(Xf[..., 0] ** 2, axis=1, weights=Ws) - MEAN_PARTICLES ** 2
-STD_PARTICLES = VAR_PARTICLES ** 0.5
+VAR_PARTICLES = (
+    jnp.average(Xf[..., 0] ** 2, axis=1, weights=Ws) - MEAN_PARTICLES**2
+)
+STD_PARTICLES = VAR_PARTICLES**0.5
 
 plt.figure()
-plt.plot(Xs, 'k')
-plt.plot(MEAN_PARTICLES, 'r')
+plt.plot(Xs, "k")
+plt.plot(MEAN_PARTICLES, "r")
 # plt.fill_between(jnp.arange(T), MEAN_PARTICLES
 #                  - 2 * STD_PARTICLES, MEAN_PARTICLES + 2 * STD_PARTICLES,
 #                  color="tab:blue", alpha=0.5)
@@ -73,15 +76,12 @@ def _constrain(params):
 def log_likelihood(params, x0, Ys, seed):
     trns_mdl, obs_mdl = build_model(_constrain(params))
     key = jax.random.PRNGKey(seed)
-    _, ell, _ = particle_filter(key, 500, Ys, x0,
-                                trns_mdl, obs_mdl)
-    return - ell
+    _, ell, _ = particle_filter(key, 500, Ys, x0, trns_mdl, obs_mdl)
+    return -ell
 
 
 def optimization_loop(seed):
-    solver = jaxopt.ScipyMinimize(fun=log_likelihood,
-                                  tol=1e-4, jit=True)
-
+    solver = jaxopt.ScipyMinimize(fun=log_likelihood, tol=1e-4, jit=True)
     init_params = jnp.array([0.0, 0.0, 0.0, 0.0])
     res = solver.run(init_params, x0=x0, Ys=Ys, seed=seed)
     return res.params
@@ -93,9 +93,10 @@ with ProgressBar():
     params_hst = dask.compute(*results)
 params_hst = jax.vmap(_constrain)(jnp.stack(params_hst))
 
-results_df = pd.DataFrame(data=params_hst,
-                          columns=[r"$\mu$", r"$\alpha$",
-                                   r"$\sigma$", r"$\rho$"])
+results_df = pd.DataFrame(
+    data=params_hst,
+    columns=[r"$\mu$", r"$\alpha$", r"$\sigma$", r"$\rho$"]
+)
 
 g = sns.PairGrid(results_df)
 g.map_upper(sns.kdeplot, fill=True)

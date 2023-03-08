@@ -44,7 +44,9 @@ def generate_data(key, x0, T, params):
 
     key, sub_key = jax.random.split(key, 2)
     _mu, _cov = obs_mdl.mean(x0), obs_mdl.cov(x0)
-    y0 = _mu + jnp.linalg.cholesky(_cov) @ jax.random.normal(sub_key, shape=(ny,))
+    y0 = _mu + jnp.linalg.cholesky(_cov) @ jax.random.normal(
+        sub_key, shape=(ny,)
+    )
 
     (key, _, _), (Xs, Ys) = jax.lax.scan(body, (key, x0, y0), (), length=T - 1)
 
@@ -57,12 +59,11 @@ def build_model(params):
     mu, a, sig, rho = params
 
     def trns_mean(x, y):
-        xn = mu * (1.0 - a) + a * x \
-             + sig * rho * y * jnp.exp(- x / 2.0)
+        xn = mu * (1.0 - a) + a * x + sig * rho * y * jnp.exp(-x / 2.0)
         return xn
 
     def trns_cov(x, y):
-        _cov = jnp.array([sig ** 2 * (1.0 - rho ** 2)])
+        _cov = jnp.array([sig**2 * (1.0 - rho**2)])
         return jnp.diag(_cov)
 
     def obs_mean(x):
