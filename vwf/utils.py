@@ -10,7 +10,48 @@ from vwf.objects import MVNStandard, MVNSqrt
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
-def kullback_leibler(i: int, q: MVNStandard, p: MVNStandard):
+def wasserstein_cond(i, q, p):
+    return wasserstein(q, p) > 1e-8
+
+
+def wasserstein_sqrt_cond(i, q, p):
+    return wasserstein_sqrt(q, p) > 1e-8
+
+
+def kullback_leibler_cond(i, q, p):
+    return kullback_leibler(q, p) > 1e-8
+
+
+def kullback_leibler_sqrt_cond(i, q, p):
+    return kullback_leibler_sqrt(q, p) > 1e-8
+
+
+def wasserstein(q: MVNStandard, p: MVNStandard):
+    x, X = q
+    y, Y = p
+
+    from jax.scipy.linalg import sqrtm
+    return (
+        jnp.linalg.norm(x - y) ** 2
+        + jnp.trace(X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y)))
+    )
+
+
+def wasserstein_sqrt(q: MVNSqrt, p: MVNSqrt):
+    x, X_sqrt = q
+    y, Y_sqrt = p
+
+    X = X_sqrt @ X_sqrt.T
+    Y = Y_sqrt @ Y_sqrt.T
+
+    from jax.scipy.linalg import sqrtm
+    return (
+        jnp.linalg.norm(x - y) ** 2
+        + jnp.trace(X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y)))
+    )
+
+
+def kullback_leibler(q: MVNStandard, p: MVNStandard):
     # KL(p || q)
     x, X = q
     y, Y = p
@@ -18,13 +59,14 @@ def kullback_leibler(i: int, q: MVNStandard, p: MVNStandard):
 
     X_inv = jnp.linalg.inv(X)
     return (
-        jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
+        jnp.trace(X_inv @ Y) / 2.0
+        - d / 2.0
         + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
         + (logdet(X) - logdet(Y)) / 2.0
-    ) > 1e-8
+    )
 
 
-def kullback_leibler_sqrt(i: int, q: MVNSqrt, p: MVNSqrt):
+def kullback_leibler_sqrt(q: MVNSqrt, p: MVNSqrt):
     # KL(p || q)
     x, X_sqrt = q
     y, Y_sqrt = p
@@ -34,14 +76,15 @@ def kullback_leibler_sqrt(i: int, q: MVNSqrt, p: MVNSqrt):
     X_inv = X_sqrt_inv.T @ X_sqrt_inv
     Y = Y_sqrt @ Y_sqrt.T
     return (
-        jnp.trace(X_inv @ Y) / 2.0 - d / 2.0
+        jnp.trace(X_inv @ Y) / 2.0
+        - d / 2.0
         + jnp.dot(x - y, jnp.dot(X_inv, x - y)) / 2.0
         + jnp.sum(jnp.log(jnp.diag(X_sqrt)))
         - jnp.sum(jnp.log(jnp.diag(Y_sqrt)))
-    ) > 1e-8
+    )
 
 
-def rk4(func, tk, yk, dt=0.01, **kwargs):
+def rk4_odeint(func, tk, yk, dt, **kwargs):
     f1 = func(tk, yk, **kwargs)
     f2 = func(tk + dt / 2.0, yk + (f1 * (dt / 2.0)), **kwargs)
     f3 = func(tk + dt / 2.0, yk + (f2 * (dt / 2.0)), **kwargs)
@@ -49,7 +92,7 @@ def rk4(func, tk, yk, dt=0.01, **kwargs):
     return yk + (dt / 6.0) * (f1 + (2.0 * f2) + (2.0 * f3) + f4)
 
 
-def euler(func, tk, yk, dt=0.01, **kwargs):
+def euler_odeint(func, tk, yk, dt, **kwargs):
     return yk + dt * func(tk, yk, **kwargs)
 
 
@@ -117,7 +160,8 @@ def tria_qr(A):
 
 @jax.custom_jvp
 def qr(A: jnp.ndarray):
-    """The JAX provided implementation is not parallelizable using VMAP. As a consequence, we have to rewrite it..."""
+    """The JAX provided implementation is not parallelizable using VMAP.
+     As a consequence, we have to rewrite it..."""
     return _qr(A)
 
 
@@ -156,19 +200,21 @@ def _householder(a):
     cond = s < eps
 
     def if_not_cond(v):
-        t = (alpha ** 2 + s) ** 0.5
-        v0 = jax.lax.cond(alpha <= 0, lambda _: alpha - t, lambda _: -s / (alpha + t), None)
-        tau = 2 * v0 ** 2 / (s + v0 ** 2)
+        t = (alpha**2 + s) ** 0.5
+        v0 = jax.lax.cond(
+            alpha <= 0, lambda _: alpha - t, lambda _: -s / (alpha + t), None
+        )
+        tau = 2 * v0**2 / (s + v0**2)
         v = v / v0
-        v = v.at[0].set(1.)
+        v = v.at[0].set(1.0)
         return v, tau
 
-    return jax.lax.cond(cond, lambda v: (v, 0.), if_not_cond, a)
+    return jax.lax.cond(cond, lambda v: (v, 0.0), if_not_cond, a)
 
 
 def qr_jvp_rule(primals, tangents):
-    x, = primals
-    dx, = tangents
+    (x,) = primals
+    (dx,) = tangents
     q, r = _qr(x, True)
     m, n = x.shape
     min_ = min(m, n)
@@ -179,7 +225,9 @@ def qr_jvp_rule(primals, tangents):
     qt_dx_rinv_lower = jnp.tril(qt_dx_rinv, -1)
     do = qt_dx_rinv_lower - qt_dx_rinv_lower.T  # This is skew-symmetric
     # The following correction is necessary for complex inputs
-    do = do + jnp.eye(min_, dtype=do.dtype) * (qt_dx_rinv - jnp.real(qt_dx_rinv))
+    do = do + jnp.eye(min_, dtype=do.dtype) * (
+        qt_dx_rinv - jnp.real(qt_dx_rinv)
+    )
     dr = jnp.matmul(qt_dx_rinv - do, r)
     return r, dr
 
