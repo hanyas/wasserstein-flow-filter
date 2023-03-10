@@ -124,7 +124,7 @@ def wasserstein_filter_sqrt(
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
-    stopping_criterion: Callable = kullback_leibler_mvn_sqrt_cond,
+    stopping_criterion: Callable = lambda i, *_: i < 500,
 ):
     def body(carry, args):
         x, ell = carry
