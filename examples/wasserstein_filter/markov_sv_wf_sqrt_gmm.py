@@ -25,6 +25,8 @@ a = 0.975
 sig = jnp.sqrt(0.02)
 rho = -0.8
 
+true_params = jnp.array([mu, a, sig, rho])
+
 m0 = jnp.array([mu, 0.0])
 P0_sqrt = jnp.diag(jnp.array([sig / jnp.sqrt(1 - a**2), 1.0]))
 init_dist = MVNSqrt(m0, P0_sqrt)
@@ -33,35 +35,30 @@ T = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-
-true_params = jnp.array([mu, a, sig, rho])
 true_states, observations = generate_data(sub_key, init_dist, T, true_params)
 
-# key, sub_key = jax.random.split(key, 2)
-# rv = jax.random.normal(sub_key, shape=(64, 2))
-# sigma_points = lambda mu, cov_sqrt: monte_carlo_points(mu, cov_sqrt, rv)
+nb_comp = 2
+mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=500)
 
-# sigma_points = lambda mu, cov_sqrt: cubature_points(mu, cov_sqrt)
-sigma_points = lambda mu, cov_sqrt: gauss_hermite_points(mu, cov_sqrt, order=5)
-
-k = 3
 key, sub_key = jax.random.split(key, 2)
-jitter = 1e-1 * jax.random.normal(sub_key, (k, 2))
+jitter = jax.random.normal(sub_key, (nb_comp, 2))
 init_gmm = GMMSqrt(
-    jnp.repeat(m0[None, :], k, axis=0) + jitter,
-    jnp.repeat(P0_sqrt[None, :], k, axis=0),
+    jnp.repeat(m0[None, :], nb_comp, axis=0) + jitter,
+    jnp.repeat(P0_sqrt[None, :], nb_comp, axis=0),
 )
 
 trans_model, obsrv_model = build_model(true_params)
 
+key, sub_key = jax.random.split(key, 2)
 filt_states, ell = jax.jit(
-    wasserstein_filter_sqrt_gmm, static_argnums=(2, 3, 4, 5)
+    wasserstein_filter_sqrt_gmm, static_argnums=(3, 4, 5, 6, 7)
 )(
+    sub_key,
     observations,
     init_gmm,
     trans_model,
     obsrv_model,
-    sigma_points,
+    mc_points,
     euler_odeint,
     step_size=1e-2,
 )
@@ -70,6 +67,7 @@ print("Likelihood: ", ell)
 #
 true_states = onp.array(true_states)
 filt_states_mean = onp.array(filt_states.mean)
+filt_states_cov_sqrt = onp.array(filt_states.cov_sqrt)
 t = onp.arange(T + 1)
 
 plt.figure()
@@ -78,15 +76,15 @@ plt.plot(t, filt_states_mean[:, 0, 0], "red")
 plt.plot(t, filt_states_mean[:, 1, 0], "blue")
 plt.fill_between(
     t,
-    filt_states.mean[:, 0, 0] - 2.0 * filt_states.cov_sqrt[:, 0, 0, 0],
-    filt_states.mean[:, 0, 0] + 2.0 * filt_states.cov_sqrt[:, 0, 0, 0],
+    filt_states_mean[:, 0, 0] - 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
+    filt_states_mean[:, 0, 0] + 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
     color="tab:red",
     alpha=0.25,
 )
 plt.fill_between(
     t,
-    filt_states.mean[:, 1, 0] - 2.0 * filt_states.cov_sqrt[:, 1, 0, 0],
-    filt_states.mean[:, 1, 0] + 2.0 * filt_states.cov_sqrt[:, 1, 0, 0],
+    filt_states_mean[:, 1, 0] - 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
+    filt_states_mean[:, 1, 0] + 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
     color="tab:blue",
     alpha=0.25,
 )

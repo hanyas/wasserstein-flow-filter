@@ -1,3 +1,5 @@
+import numpy as onp
+
 import jax.numpy as jnp
 import jax.random
 
@@ -23,21 +25,17 @@ a = 0.975
 sig = jnp.sqrt(0.02)
 rho = -0.8
 
+true_params = jnp.array([mu, a, sig, rho])
+
 m0 = jnp.array([mu, 0.0])
 P0_sqrt = jnp.diag(jnp.array([sig / jnp.sqrt(1 - a**2), 1.0]))
 init_dist = MVNSqrt(m0, P0_sqrt)
 
+T = 500
+
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-
-true_params = jnp.array([mu, a, sig, rho])
-true_states, observations = generate_data(
-    sub_key, init_dist, 500, true_params
-)
-
-# key, sub_key = jax.random.split(key, 2)
-# rv = jax.random.normal(sub_key, shape=(64, 2))
-# sigma_points = lambda mu, cov_sqrt: monte_carlo_points(mu, cov_sqrt, rv)
+true_states, observations = generate_data(sub_key, init_dist, T, true_params)
 
 # sigma_points = lambda mu, cov_sqrt: cubature_points(mu, cov_sqrt)
 sigma_points = lambda mu, cov_sqrt: gauss_hermite_points(mu, cov_sqrt, order=5)
@@ -56,52 +54,58 @@ filt_states, ell = jax.jit(
 )
 print("Likelihood: ", ell)
 
-import numpy as np
-plt.figure()
+#
+true_state = onp.array(true_states)
+filt_states_mean = onp.array(filt_states.mean)
+filt_states_cov_sqrt = onp.array(filt_states.cov_sqrt)
+t = onp.arange(T + 1)
 
-T = 500
-t = np.arange(T)
-plt.plot(t, true_states[1:, 0], "k")
-plt.plot(t, filt_states.mean[1:, 0], "r")
-plt.fill_between(t,
-                 filt_states.mean[1:, 0] - 2. * filt_states.cov_sqrt[1:, 0, 0],
-                 filt_states.mean[1:, 0] + 2. * filt_states.cov_sqrt[1:, 0, 0], alpha=0.2)
+plt.figure()
+plt.plot(t, true_states[:, 0], "k")
+plt.plot(t, filt_states_mean[:, 0], "r")
+plt.fill_between(
+    t,
+    filt_states_mean[:, 0] - 2. * filt_states_cov_sqrt[:, 0, 0],
+    filt_states_mean[:, 0] + 2. * filt_states_cov_sqrt[:, 0, 0],
+    color="tab:red",
+    alpha=0.25
+)
 plt.show()
 
 
-def _tanh(x):
-    return jnp.clip(jnp.tanh(x), -0.999, 0.999)
-
-
-def _constrain(params):
-    mu, a_aux, sig_aux, rho_aux = params
-    a, rho = _tanh(a_aux), _tanh(rho_aux)
-    sig = jnp.log1p(jnp.exp(sig_aux))
-    return jnp.array([mu, a, sig, rho])
-
-
-def log_likelihood(params, init_dist, observations):
-    trans_model, obsrv_model = build_model(_constrain(params))
-    _, ell = wasserstein_filter_sqrt(
-        observations,
-        init_dist,
-        trans_model,
-        obsrv_model,
-        sigma_points,
-        euler_odeint,
-        step_size=1e-2,
-    )
-    return -ell
-
-
-solver = jaxopt.ScipyMinimize(
-    fun=log_likelihood,
-    method="SLSQP",
-    options={"disp": True},
-    jit=True,
-    maxiter=15,
-)
-
-init_params = jnp.array([0.0, 0.0, 0.0, 0.0])
-opt_params = solver.run(init_params, init_dist, observations).params
-print(_constrain(opt_params))
+# def _tanh(x):
+#     return jnp.clip(jnp.tanh(x), -0.999, 0.999)
+#
+#
+# def _constrain(params):
+#     mu, a_aux, sig_aux, rho_aux = params
+#     a, rho = _tanh(a_aux), _tanh(rho_aux)
+#     sig = jnp.log1p(jnp.exp(sig_aux))
+#     return jnp.array([mu, a, sig, rho])
+#
+#
+# def log_likelihood(params, init_dist, observations):
+#     trans_model, obsrv_model = build_model(_constrain(params))
+#     _, ell = wasserstein_filter_sqrt(
+#         observations,
+#         init_dist,
+#         trans_model,
+#         obsrv_model,
+#         sigma_points,
+#         euler_odeint,
+#         step_size=1e-2,
+#     )
+#     return -ell
+#
+#
+# solver = jaxopt.ScipyMinimize(
+#     fun=log_likelihood,
+#     method="SLSQP",
+#     options={"disp": True},
+#     jit=True,
+#     maxiter=15,
+# )
+#
+# init_params = jnp.array([0.0, 0.0, 0.0, 0.0])
+# opt_params = solver.run(init_params, init_dist, observations).params
+# print(_constrain(opt_params))
