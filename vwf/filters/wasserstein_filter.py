@@ -5,8 +5,8 @@ import jax.random
 from jax.flatten_util import ravel_pytree
 
 import jax.numpy as jnp
-from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
+from jax.experimental.ode import odeint
 
 from vwf.objects import MVNStandard, ConditionalModel
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
@@ -14,12 +14,12 @@ from vwf.utils import kullback_leibler_mvn_cond, wasserstein_mvn_cond
 
 
 def linearize(model: ConditionalModel, x: MVNStandard):
-    mean, cov = model
+    mean_fcn, cov_fcn = model
     m, p = x
 
-    F = jax.jacfwd(mean, 0)(m)
-    b = mean(m) - F @ m
-    Q = cov(m)
+    F = jax.jacfwd(mean_fcn, 0)(m)
+    b = mean_fcn(m) - F @ m
+    Q = cov_fcn(m)
     return F, b, Q
 
 
@@ -30,14 +30,23 @@ def predict(F, b, Q, x):
     return MVNStandard(m, P)
 
 
-def potential(x, y, prior, obs_mdl):
+def log_target(
+    # Log-target is the negative potential V
+    state: jnp.ndarray,
+    observation: jnp.ndarray,
+    prior: MVNStandard,
+    observation_model: ConditionalModel,
+):
     m, P = prior
-    mean_fcn, cov_fcn = obs_mdl
-    mean_y, cov_y = mean_fcn(x), cov_fcn(x)
-    return -mvn.logpdf(y, mean_y, cov_y) - mvn.logpdf(x, m, P)
+    mean_fcn, cov_fcn = observation_model
+    mean_y, cov_y = mean_fcn(state), cov_fcn(state)
+    return (
+        mvn.logpdf(observation, mean_y, cov_y)
+        + mvn.logpdf(state, m, P)
+    )
 
 
-def ode(
+def ode_step(
     dist: MVNStandard,
     prior: MVNStandard,
     observation: jnp.ndarray,
@@ -47,11 +56,11 @@ def ode(
     step_size: float,
 ):
     d = dist.dim
-    gradV = jax.grad(potential)
+    gradV = jax.grad(log_target)
 
     _dist, _unflatten = ravel_pytree(dist)
 
-    def _ode_fcn(t, x):
+    def _ode(t, x):
         mu, sigma = _unflatten(x)
 
         z, w = sigma_points(mu, jnp.linalg.cholesky(sigma))
@@ -60,17 +69,17 @@ def ode(
             z, observation, prior, observation_model
         )
 
-        mu_dt = -jnp.einsum("nk,n->k", dV, w)
+        mu_dt = jnp.einsum("nk,n->k", dV, w)
         sigma_dt = (
             2.0 * jnp.eye(d)
-            - jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
-            - jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
+            + jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
+            + jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
         )
 
         dx_dt = MVNStandard(mu_dt, sigma_dt)
         return ravel_pytree(dx_dt)[0]
 
-    _dist = integrator(_ode_fcn, 0.0, _dist, dt=step_size)
+    _dist = integrator(func=_ode, tk=0.0, yk=_dist, dt=step_size)
     return _unflatten(_dist)
 
 
@@ -84,7 +93,7 @@ def integrate_ode(
     criterion: Callable,
 ):
     def fun_to_iter(dist):
-        return ode(
+        return ode_step(
             dist,
             prior,
             observation,

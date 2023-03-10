@@ -5,7 +5,6 @@ import jax.random
 from jax.flatten_util import ravel_pytree
 
 import jax.numpy as jnp
-from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
@@ -16,12 +15,12 @@ from vwf.utils import tria_qr, tria_tril
 
 
 def linearize(model: ConditionalModelSqrt, x: MVNSqrt):
-    mean, cov_sqrt = model
+    mean_fcn, cov_sqrt_fcn = model
     m, _ = x
 
-    F = jax.jacfwd(mean, 0)(m)
-    b = mean(m) - F @ m
-    Q_sqrt = cov_sqrt(m)
+    F = jax.jacfwd(mean_fcn, 0)(m)
+    b = mean_fcn(m) - F @ m
+    Q_sqrt = cov_sqrt_fcn(m)
     return F, b, Q_sqrt
 
 
@@ -32,17 +31,23 @@ def predict(F, b, Q_sqrt, x):
     return MVNSqrt(m, P_sqrt)
 
 
-def potential(x, y, prior_sqrt, obs_mdl):
+def log_target(
+    # Log-target is the negative potential V
+    state: jnp.ndarray,
+    observation: jnp.ndarray,
+    prior_sqrt: MVNSqrt,
+    observation_model: ConditionalModelSqrt,
+):
     m, P_sqrt = prior_sqrt
-    mean_fcn, cov_sqrt_fcn = obs_mdl
-    mean_y, cov_sqrt_y = mean_fcn(x), cov_sqrt_fcn(x)
+    mean_fcn, cov_sqrt_fcn = observation_model
+    mean_y, cov_sqrt_y = mean_fcn(state), cov_sqrt_fcn(state)
     return (
-        - mvn.logpdf(y, mean_y, cov_sqrt_y @ cov_sqrt_y.T)
-        - mvn.logpdf(x, m, P_sqrt @ P_sqrt.T)
+            mvn.logpdf(observation, mean_y, cov_sqrt_y @ cov_sqrt_y.T)
+            + mvn.logpdf(state, m, P_sqrt @ P_sqrt.T)
     )
 
 
-def ode(
+def ode_step(
     dist_sqrt: MVNSqrt,
     prior_sqrt: MVNSqrt,
     observation: jnp.ndarray,
@@ -52,11 +57,11 @@ def ode(
     step_size: float,
 ):
     d = dist_sqrt.dim
-    gradV = jax.grad(potential)
+    gradV = jax.grad(log_target)
 
     _dist_sqrt, _unflatten = ravel_pytree(dist_sqrt)
 
-    def _ode_fcn(t, x):
+    def _ode(t, x):
         mu, sigma_sqrt = _unflatten(x)
 
         z, w = sigma_points(mu, sigma_sqrt)
@@ -67,13 +72,13 @@ def ode(
 
         sigma_dt = (
             2.0 * jnp.eye(d)
-            - jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
-            - jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
+            + jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
+            + jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
         )
 
         sigma_sqrt_inv = jnp.linalg.inv(sigma_sqrt)
 
-        mu_dt = -jnp.einsum("nk,n->k", dV, w)
+        mu_dt = jnp.einsum("nk,n->k", dV, w)
         sigma_sqrt_dt = sigma_sqrt @ tria_tril(
             sigma_sqrt_inv @ sigma_dt @ sigma_sqrt_inv.T
         )
@@ -82,10 +87,10 @@ def ode(
         return ravel_pytree(dx_dt)[0]
 
     # t = jnp.linspace(0.0, dt, 2)
-    # _ode_fcn_flp = lambda t, x: _ode_fcn(x, t)
-    # _dist_sqrt = odeint(_ode_fcn_flp, _dist_sqrt, t)[-1, :]
+    # _ode_flp = lambda t, x: _ode(x, t)
+    # _dist_sqrt = odeint(_ode_flp, _dist_sqrt, t)[-1, :]
 
-    _dist_sqrt = integrator(_ode_fcn, 0.0, _dist_sqrt, dt=step_size)
+    _dist_sqrt = integrator(func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
     return _unflatten(_dist_sqrt)
 
 
@@ -99,7 +104,7 @@ def integrate_ode(
     criterion: Callable,
 ):
     def fun_to_iter(dist_sqrt):
-        return ode(
+        return ode_step(
             dist_sqrt,
             prior_sqrt,
             observation,
