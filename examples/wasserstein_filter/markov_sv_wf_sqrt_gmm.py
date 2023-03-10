@@ -1,3 +1,5 @@
+import numpy as onp
+
 import jax.numpy as jnp
 import jax.random
 
@@ -27,13 +29,13 @@ m0 = jnp.array([mu, 0.0])
 P0_sqrt = jnp.diag(jnp.array([sig / jnp.sqrt(1 - a**2), 1.0]))
 init_dist = MVNSqrt(m0, P0_sqrt)
 
+T = 500
+
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
 
 true_params = jnp.array([mu, a, sig, rho])
-true_states, observations = generate_data(
-    sub_key, init_dist, 500, true_params
-)
+true_states, observations = generate_data(sub_key, init_dist, T, true_params)
 
 # key, sub_key = jax.random.split(key, 2)
 # rv = jax.random.normal(sub_key, shape=(64, 2))
@@ -65,7 +67,27 @@ filt_states, ell = jax.jit(
 )
 print("Likelihood: ", ell)
 
+#
+true_states = onp.array(true_states)
+filt_states_mean = onp.array(filt_states.mean)
+t = onp.arange(T + 1)
+
 plt.figure()
-plt.plot(true_states[1:, 0], "k")
-plt.plot(jnp.mean(filt_states.mean, axis=1)[1:, 0], "r")
+plt.plot(t, true_states[:, 0], "k")
+plt.plot(t, filt_states_mean[:, 0, 0], "red")
+plt.plot(t, filt_states_mean[:, 1, 0], "blue")
+plt.fill_between(
+    t,
+    filt_states.mean[:, 0, 0] - 2.0 * filt_states.cov_sqrt[:, 0, 0, 0],
+    filt_states.mean[:, 0, 0] + 2.0 * filt_states.cov_sqrt[:, 0, 0, 0],
+    color="tab:red",
+    alpha=0.25,
+)
+plt.fill_between(
+    t,
+    filt_states.mean[:, 1, 0] - 2.0 * filt_states.cov_sqrt[:, 1, 0, 0],
+    filt_states.mean[:, 1, 0] + 2.0 * filt_states.cov_sqrt[:, 1, 0, 0],
+    color="tab:blue",
+    alpha=0.25,
+)
 plt.show()

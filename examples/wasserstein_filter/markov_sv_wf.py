@@ -1,3 +1,5 @@
+import numpy as onp
+
 import jax.numpy as jnp
 import jax.random
 
@@ -33,7 +35,7 @@ key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
 
 true_params = jnp.array([mu, a, sig, rho])
-true_states, observations = generate_data(sub_key, init_dist, 500, true_params)
+true_states, observations = generate_data(sub_key, init_dist, T, true_params)
 
 # key, sub_key = jax.random.split(key, 2)
 # rv = jax.random.normal(sub_key, shape=(64, 2))
@@ -57,7 +59,19 @@ filt_states, ell = jax.jit(
 )
 print("Likelihood: ", ell)
 
+#
+true_state = onp.array(true_states)
+filt_states_mean = onp.array(filt_states.mean)
+t = onp.arange(T + 1)
+
 plt.figure()
-plt.plot(true_states[1:, 0], "k")
-plt.plot(filt_states.mean[1:, 0], "r")
+plt.plot(t, true_state[:, 0], "k")
+plt.plot(t, filt_states_mean[:, 0], "r")
+plt.fill_between(
+    t,
+    filt_states.mean[:, 0] - 2. * filt_states.cov[:, 0, 0]**0.5,
+    filt_states_mean[:, 0] + 2. * filt_states.cov[:, 0, 0]**0.5,
+    color="tab:red",
+    alpha=0.25,
+)
 plt.show()

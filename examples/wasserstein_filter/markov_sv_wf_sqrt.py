@@ -56,9 +56,16 @@ filt_states, ell = jax.jit(
 )
 print("Likelihood: ", ell)
 
+import numpy as np
 plt.figure()
-plt.plot(true_states[1:, 0], "k")
-plt.plot(filt_states.mean[1:, 0], "r")
+
+T = 500
+t = np.arange(T)
+plt.plot(t, true_states[1:, 0], "k")
+plt.plot(t, filt_states.mean[1:, 0], "r")
+plt.fill_between(t,
+                 filt_states.mean[1:, 0] - 2. * filt_states.cov_sqrt[1:, 0, 0],
+                 filt_states.mean[1:, 0] + 2. * filt_states.cov_sqrt[1:, 0, 0], alpha=0.2)
 plt.show()
 
 
