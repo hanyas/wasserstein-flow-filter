@@ -12,20 +12,20 @@ def generate_data(key, z0, T, params):
 
     def transition_fcn(key, z):
         _mu = trns_mdl.mean(z)
-        _cov = trns_mdl.cov(z)
-        _cov_sqrt = jnp.linalg.cholesky(_cov)
+        _sigma = trns_mdl.cov(z)
+        _cov_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
-        zn = _mu + _cov_sqrt @ jax.random.normal(sub_key, shape=(nz,))
+        zn = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(nz,))
         return key, zn
 
     def observation_fcn(key, z):
         _mu = obs_mdl.mean(z)
-        _cov = obs_mdl.cov(z)
-        _cov_sqrt = jnp.linalg.cholesky(_cov)
+        _sigma = obs_mdl.cov(z)
+        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
-        y = _mu + _cov_sqrt @ jax.random.normal(sub_key, shape=(ny,))
+        y = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
         return key, y
 
     def body(carry, args):

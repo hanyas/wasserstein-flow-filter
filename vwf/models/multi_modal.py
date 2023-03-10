@@ -2,9 +2,6 @@ import jax
 from jax import numpy as jnp
 
 from vwf.objects import ConditionalMVN
-from vwf.objects import ConditionalLogNorm
-
-from tensorflow_probability.substrates.jax.distributions import LogNormal as lognorm
 
 
 def generate_data(key, x0, T, params):
@@ -22,11 +19,11 @@ def generate_data(key, x0, T, params):
         return key, xn
 
     def observation_fcn(key, x):
-        _loc = obs_mdl.loc(x)
-        _scale = obs_mdl.scale(x)
+        _mu = obs_mdl.mean(x)
+        _sigma = obs_mdl.cov(x)
 
         key, sub_key = jax.random.split(key, 2)
-        y = lognorm(_loc, _scale).sample(seed=sub_key)
+        y = _mu + jnp.linalg.cholesky(_sigma) @ jax.random.normal(sub_key, shape=(ny,))
         return key, y
 
     def body(carry, args):
@@ -54,12 +51,12 @@ def build_model(params):
     def trns_cov(x):
         return jnp.eye(1)
 
-    def obs_loc(x):
-        return jnp.abs(x) - jnp.exp(0.5 * s ** 2)
+    def obs_mean(x):
+        return jnp.abs(x)
 
-    def obs_scale(x):
-        return s
+    def obs_cov(x):
+        return jnp.eye(1) * s**2
 
     trns_mdl = ConditionalMVN(trns_mean, trns_cov)
-    obs_mdl = ConditionalLogNorm(obs_loc, obs_scale)
+    obs_mdl = ConditionalMVN(obs_mean, obs_cov)
     return trns_mdl, obs_mdl
