@@ -35,7 +35,8 @@ def generate_data(key, x0, T, params):
     key, sub_key = jax.random.split(key, 2)
 
     m0, P0_sqrt = x0
-    x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
+    # x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
+    x0 = jnp.array([-3.0])
     (key, _), (Xs, Ys) = jax.lax.scan(body, (key, x0), (), length=T)
 
     Xs = jnp.insert(Xs, 0, x0, 0)
