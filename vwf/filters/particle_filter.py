@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable
 
 import jax
 import jax.random
@@ -9,7 +9,7 @@ from jax.flatten_util import ravel_pytree
 from jax.scipy.special import logsumexp
 
 from vwf.objects import MVNStandard
-from vwf.objects import ConditionalMVN, ConditionalLogNorm
+from vwf.objects import ConditionalMVN
 
 
 def _stratified_resampling(x, w, u):
@@ -42,7 +42,7 @@ def particle_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
-    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
+    observation_model: ConditionalMVN,
     resampling_scheme: Callable = _stratified_resampling,
 ):
     N = nb_particles
@@ -114,7 +114,7 @@ def non_markov_particle_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
-    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
+    observation_model: ConditionalMVN,
     resampling_scheme: Callable = _stratified_resampling,
 ):
     N = nb_particles
@@ -186,7 +186,7 @@ def non_markov_stratified_particle_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
-    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
+    observation_model: ConditionalMVN,
 ):
     return non_markov_particle_filter(
         key,
@@ -205,7 +205,7 @@ def non_markov_diffable_particle_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
-    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
+    observation_model: ConditionalMVN,
 ):
     return non_markov_particle_filter(
         key,
