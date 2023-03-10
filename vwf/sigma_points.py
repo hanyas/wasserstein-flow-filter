@@ -8,11 +8,11 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def monte_carlo_points(mu, cov_sqrt, rv):
-    n, d = rv.shape
-    p = mu[None, :] + jnp.einsum('kh,nh->nk', cov_sqrt, rv)
-    wm = jnp.ones((n, )) / n
-    return p, wm
+def monte_carlo_points(key, dim, nb_comp, nb_samples):
+    key, sub_key = jax.random.split(key, 2)
+    rv = jax.random.normal(sub_key, shape=(nb_comp, nb_samples, dim))
+    wm = jnp.ones((nb_comp, nb_samples)) / nb_samples
+    return key, rv, wm
 
 
 def cubature_points(mu, cov_sqrt):
