@@ -5,15 +5,15 @@ import jax.random
 from jax.scipy.linalg import cho_solve
 from jax.scipy.stats import multivariate_normal as mvn
 
-from vwf.objects import MVNStandard, ConditionalModel
+from vwf.objects import MVNStandard, ConditionalMVN
 from vwf.utils import none_or_concat
 
 
 def kalman_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: ConditionalMVN,
 ):
     def _linearize(model, x):
         mean, cov = model

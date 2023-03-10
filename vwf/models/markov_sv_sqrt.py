@@ -1,7 +1,7 @@
 import jax
 from jax import numpy as jnp
 
-from vwf.objects import ConditionalModelSqrt
+from vwf.objects import ConditionalMVNSqrt
 
 
 def generate_data(key, z0, T, params):
@@ -65,6 +65,6 @@ def build_model(params):
         _cov = jnp.array([(1.0 - rho**2) * jnp.exp(x)])
         return jnp.diag(jnp.sqrt(_cov))
 
-    trns_mdl = ConditionalModelSqrt(trns_mean, trns_cov_sqrt)
-    obs_mdl = ConditionalModelSqrt(obs_mean, obs_cov_sqrt)
+    trns_mdl = ConditionalMVNSqrt(trns_mean, trns_cov_sqrt)
+    obs_mdl = ConditionalMVNSqrt(obs_mean, obs_cov_sqrt)
     return trns_mdl, obs_mdl

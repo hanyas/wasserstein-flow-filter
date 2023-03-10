@@ -8,13 +8,13 @@ import jax.numpy as jnp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
-from vwf.objects import MVNSqrt, ConditionalModelSqrt
+from vwf.objects import MVNSqrt, ConditionalMVNSqrt
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from vwf.utils import tria_qr, tria_tril
 
 
-def linearize(model: ConditionalModelSqrt, x: MVNSqrt):
+def linearize(model: ConditionalMVNSqrt, x: MVNSqrt):
     mean_fcn, cov_sqrt_fcn = model
     m, _ = x
 
@@ -36,7 +36,7 @@ def log_target(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior_sqrt: MVNSqrt,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
 ):
     m, P_sqrt = prior_sqrt
     mean_fcn, cov_sqrt_fcn = observation_model
@@ -51,7 +51,7 @@ def ode_step(
     dist_sqrt: MVNSqrt,
     prior_sqrt: MVNSqrt,
     observation: jnp.ndarray,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -97,7 +97,7 @@ def ode_step(
 def integrate_ode(
     prior_sqrt: MVNSqrt,
     observation: jnp.ndarray,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -120,8 +120,8 @@ def integrate_ode(
 def wasserstein_filter_sqrt(
     observations: jnp.ndarray,
     initial_dist: MVNSqrt,
-    transition_model: ConditionalModelSqrt,
-    observation_model: ConditionalModelSqrt,
+    transition_model: ConditionalMVNSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,

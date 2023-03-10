@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Union
 
 import jax
 import jax.random
@@ -7,9 +7,9 @@ from jax import numpy as jnp
 from jax.flatten_util import ravel_pytree
 
 from jax.scipy.special import logsumexp
-from jax.scipy.stats import multivariate_normal as mvn
 
-from vwf.objects import MVNStandard, ConditionalModel
+from vwf.objects import MVNStandard
+from vwf.objects import ConditionalMVN, ConditionalLogNorm
 
 
 def _stratified_resampling(x, w, u):
@@ -41,8 +41,8 @@ def particle_filter(
     nb_particles: int,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
     resampling_scheme: Callable = _stratified_resampling,
 ):
     N = nb_particles
@@ -52,10 +52,7 @@ def particle_filter(
         return xn
 
     def _log_weights(x, y, obs_mdl):
-        mu_y = obs_mdl.mean(x)
-        cov_y = obs_mdl.cov(x)
-        log_w = mvn.logpdf(y, mu_y, cov_y)
-        return log_w
+        return obs_mdl.logpdf(x, y)
 
     def body(carry, args):
         x, ell = carry
@@ -116,8 +113,8 @@ def non_markov_particle_filter(
     nb_particles: int,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
     resampling_scheme: Callable = _stratified_resampling,
 ):
     N = nb_particles
@@ -127,10 +124,7 @@ def non_markov_particle_filter(
         return xn
 
     def _log_weights(x, y, obs_mdl):
-        mu_y = obs_mdl.mean(x)
-        cov_y = obs_mdl.cov(x)
-        log_w = mvn.logpdf(y, mu_y, cov_y)
-        return log_w
+        return obs_mdl.logpdf(x, y)
 
     def body(carry, args):
         x, ell = carry
@@ -191,8 +185,8 @@ def non_markov_stratified_particle_filter(
     nb_particles: int,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
 ):
     return non_markov_particle_filter(
         key,
@@ -210,8 +204,8 @@ def non_markov_diffable_particle_filter(
     nb_particles: int,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: Union[ConditionalMVN, ConditionalLogNorm],
 ):
     return non_markov_particle_filter(
         key,

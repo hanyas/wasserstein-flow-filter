@@ -9,13 +9,13 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
-from vwf.objects import GMMSqrt, MVNSqrt, ConditionalModelSqrt
+from vwf.objects import GMMSqrt, MVNSqrt, ConditionalMVNSqrt
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from vwf.utils import tria_qr, tria_tril
 
 
-def linearize(model: ConditionalModelSqrt, x: GMMSqrt):
+def linearize(model: ConditionalMVNSqrt, x: GMMSqrt):
     mean_fcn, cov_sqrt_fcn = model
     ms, _ = x
 
@@ -40,7 +40,7 @@ def log_target(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior_sqrt: GMMSqrt,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
 ):
     ms, Ps_sqrt = prior_sqrt
     mean_fcn, cov_sqrt_fcn = observation_model
@@ -60,7 +60,7 @@ def ode_step(
     dist_sqrt: GMMSqrt,
     prior_sqrt: GMMSqrt,
     observation: jnp.ndarray,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -121,7 +121,7 @@ def ode_step(
 def integrate_ode(
     prior_sqrt: GMMSqrt,
     observation: jnp.ndarray,
-    observation_model: ConditionalModelSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -144,8 +144,8 @@ def integrate_ode(
 def wasserstein_filter_sqrt_gmm(
     observations: jnp.ndarray,
     initial_dist: GMMSqrt,
-    transition_model: ConditionalModelSqrt,
-    observation_model: ConditionalModelSqrt,
+    transition_model: ConditionalMVNSqrt,
+    observation_model: ConditionalMVNSqrt,
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
@@ -163,16 +163,6 @@ def wasserstein_filter_sqrt_gmm(
         # predict
         Fs, bs, Qs_sqrt = linearize(transition_model, x)
         xp = predict(Fs, bs, Qs_sqrt, x)
-
-        # ode_step(
-        #     xp,
-        #     xp,
-        #     y,
-        #     observation_model,
-        #     sigma_points,
-        #     integrator,
-        #     step_size,
-        # )
 
         # innovate
         xf = integrate_ode(

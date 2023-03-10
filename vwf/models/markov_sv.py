@@ -1,7 +1,7 @@
 import jax
 from jax import numpy as jnp
 
-from vwf.objects import ConditionalModel
+from vwf.objects import ConditionalMVN
 
 
 def generate_data(key, z0, T, params):
@@ -68,6 +68,6 @@ def build_model(params):
         _cov = jnp.array([(1.0 - rho**2) * jnp.exp(x)])
         return jnp.diag(_cov)
 
-    trns_mdl = ConditionalModel(trns_mean, trns_cov)
-    obs_mdl = ConditionalModel(obs_mean, obs_cov)
+    trns_mdl = ConditionalMVN(trns_mean, trns_cov)
+    obs_mdl = ConditionalMVN(obs_mean, obs_cov)
     return trns_mdl, obs_mdl

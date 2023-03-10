@@ -8,12 +8,12 @@ import jax.numpy as jnp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
-from vwf.objects import MVNStandard, ConditionalModel
+from vwf.objects import MVNStandard, ConditionalMVN
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_cond, wasserstein_mvn_cond
 
 
-def linearize(model: ConditionalModel, x: MVNStandard):
+def linearize(model: ConditionalMVN, x: MVNStandard):
     mean_fcn, cov_fcn = model
     m, p = x
 
@@ -35,7 +35,7 @@ def log_target(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior: MVNStandard,
-    observation_model: ConditionalModel,
+    observation_model: ConditionalMVN,
 ):
     m, P = prior
     mean_fcn, cov_fcn = observation_model
@@ -50,7 +50,7 @@ def ode_step(
     dist: MVNStandard,
     prior: MVNStandard,
     observation: jnp.ndarray,
-    observation_model: ConditionalModel,
+    observation_model: ConditionalMVN,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -86,7 +86,7 @@ def ode_step(
 def integrate_ode(
     prior: MVNStandard,
     observation: jnp.ndarray,
-    observation_model: ConditionalModel,
+    observation_model: ConditionalMVN,
     sigma_points: Callable,
     integrator: Callable,
     step_size: float,
@@ -109,8 +109,8 @@ def integrate_ode(
 def wasserstein_filter(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
-    transition_model: ConditionalModel,
-    observation_model: ConditionalModel,
+    transition_model: ConditionalMVN,
+    observation_model: ConditionalMVN,
     sigma_points: Callable,
     integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
