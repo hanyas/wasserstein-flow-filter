@@ -20,6 +20,19 @@ class MVNSqrt(NamedTuple):
         return self.mean.shape[-1]
 
 
+class GMMSqrt(NamedTuple):
+    mean: jnp.array
+    cov_sqrt: jnp.array
+
+    @property
+    def dim(self):
+        return self.mean.shape[-1]
+
+    @property
+    def size(self):
+        return self.mean.shape[0]
+
+
 class FunctionalModel(NamedTuple):
     function: Callable
     mvn: MVNStandard
