@@ -11,6 +11,7 @@ from jax.experimental.ode import odeint
 from vwf.objects import MVNStandard, ConditionalMVN
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_cond, wasserstein_mvn_cond
+from vwf.utils import none_or_concat
 
 
 def linearize(model: ConditionalMVN, x: MVNStandard):
@@ -38,10 +39,8 @@ def log_target(
     observation_model: ConditionalMVN,
 ):
     m, P = prior
-    mean_fcn, cov_fcn = observation_model
-    mean_y, cov_y = mean_fcn(state), cov_fcn(state)
     return (
-        mvn.logpdf(observation, mean_y, cov_y)
+        observation_model.logpdf(state, observation)
         + mvn.logpdf(state, m, P)
     )
 
@@ -116,11 +115,6 @@ def wasserstein_filter(
     step_size: float = 1e-2,
     stopping_criterion: Callable = kullback_leibler_mvn_cond,
 ):
-    def _cond_log_pdf(x, y, obs_mdl):
-        mean_fcn, cov_fcn = obs_mdl
-        mean_y, cov_y = mean_fcn(x), cov_fcn(x)
-        return mvn.logpdf(y, mean_y, cov_y)
-
     def body(carry, args):
         x, ell = carry
         y = args
@@ -143,9 +137,7 @@ def wasserstein_filter(
         # ell
         mu, sigma = xp
         z, w = sigma_points(mu, jnp.linalg.cholesky(sigma))
-        log_pdfs = jax.vmap(_cond_log_pdf, in_axes=(0, None, None))(
-            z, y, observation_model
-        )
+        log_pdfs = jax.vmap(observation_model.logpdf, in_axes=(0, None))(z, y)
         ell += jnp.log(jnp.average(jnp.exp(log_pdfs), weights=w))
 
         return (xf, ell), xf
@@ -154,4 +146,5 @@ def wasserstein_filter(
     ys = observations
 
     (_, ell), xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
+    xf = none_or_concat(xf, x0, 1)
     return xf, ell

@@ -9,10 +9,11 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
-from vwf.objects import GMMSqrt, MVNSqrt, ConditionalMVNSqrt
+from vwf.objects import GMMSqrt, ConditionalMVNSqrt
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from vwf.utils import tria_qr, tria_tril
+from vwf.utils import none_or_concat
 
 
 def linearize(model: ConditionalMVNSqrt, x: GMMSqrt):
@@ -43,15 +44,10 @@ def log_target(
     observation_model: ConditionalMVNSqrt,
 ):
     ms, Ps_sqrt = prior_sqrt
-    mean_fcn, cov_sqrt_fcn = observation_model
-    means_y = mean_fcn(state)
-    covs_sqrt_y = cov_sqrt_fcn(state)
-
-    covs_y = covs_sqrt_y @ covs_sqrt_y.T
-    covs_x = jnp.einsum("nij,nkj->nik", Ps_sqrt, Ps_sqrt)
+    sigma_x = jnp.einsum("nij,nkj->nik", Ps_sqrt, Ps_sqrt)
     out = (
-        mvn.logpdf(observation, means_y, covs_y)
-        + mvn.logpdf(state, ms, covs_x)
+        observation_model.logpdf(state, observation)
+        + mvn.logpdf(state, ms, sigma_x)
     )
     return logsumexp(out)
 
@@ -180,9 +176,7 @@ def wasserstein_filter_sqrt_gmm(
         zs, ws = jax.vmap(sigma_points)(mus, sigmas_sqrt)
 
         def _ell(z, w):
-            _log_pdfs = jax.vmap(_cond_log_pdf, in_axes=(0, None, None))(
-                z, y, observation_model
-            )
+            _log_pdfs = jax.vmap(observation_model.logpdf, in_axes=(0, None))(z, y)
             return jnp.log(jnp.average(jnp.exp(_log_pdfs), weights=w))
 
         ell += jnp.mean(jax.vmap(_ell)(zs, ws))
@@ -192,4 +186,5 @@ def wasserstein_filter_sqrt_gmm(
     ys = observations
 
     (_, ell), xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
+    xf = none_or_concat(xf, x0, 1)
     return xf, ell

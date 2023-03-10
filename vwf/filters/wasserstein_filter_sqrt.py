@@ -12,6 +12,7 @@ from vwf.objects import MVNSqrt, ConditionalMVNSqrt
 from vwf.utils import fixed_point, rk4_odeint, euler_odeint
 from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from vwf.utils import tria_qr, tria_tril
+from vwf.utils import none_or_concat
 
 
 def linearize(model: ConditionalMVNSqrt, x: MVNSqrt):
@@ -39,10 +40,8 @@ def log_target(
     observation_model: ConditionalMVNSqrt,
 ):
     m, P_sqrt = prior_sqrt
-    mean_fcn, cov_sqrt_fcn = observation_model
-    mean_y, cov_sqrt_y = mean_fcn(state), cov_sqrt_fcn(state)
     return (
-            mvn.logpdf(observation, mean_y, cov_sqrt_y @ cov_sqrt_y.T)
+            observation_model.logpdf(state, observation)
             + mvn.logpdf(state, m, P_sqrt @ P_sqrt.T)
     )
 
@@ -127,11 +126,6 @@ def wasserstein_filter_sqrt(
     step_size: float = 1e-2,
     stopping_criterion: Callable = kullback_leibler_mvn_sqrt_cond,
 ):
-    def _cond_log_pdf(x, y, obs_mdl):
-        mean_fcn, cov_sqrt_fcn = obs_mdl
-        mean_y, cov_sqrt_y = mean_fcn(x), cov_sqrt_fcn(x)
-        return mvn.logpdf(y, mean_y, cov_sqrt_y @ cov_sqrt_y.T)
-
     def body(carry, args):
         x, ell = carry
         y = args
@@ -154,9 +148,7 @@ def wasserstein_filter_sqrt(
         # ell
         mu, sigma_sqrt = xp
         z, w = sigma_points(mu, sigma_sqrt)
-        log_pdfs = jax.vmap(_cond_log_pdf, in_axes=(0, None, None))(
-            z, y, observation_model
-        )
+        log_pdfs = jax.vmap(observation_model.logpdf, in_axes=(0, None))(z, y)
         ell += jnp.log(jnp.average(jnp.exp(log_pdfs), weights=w))
 
         return (xf, ell), xf
@@ -165,4 +157,5 @@ def wasserstein_filter_sqrt(
     ys = observations
 
     (_, ell), xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
+    xf = none_or_concat(xf, x0, 1)
     return xf, ell
