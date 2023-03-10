@@ -11,8 +11,6 @@ from vwf.models.markov_sv import build_model, generate_data
 
 from vwf.sigma_points import cubature_points
 from vwf.sigma_points import gauss_hermite_points
-from vwf.sigma_points import monte_carlo_points
-
 from vwf.utils import euler_odeint
 
 jax.config.update("jax_platform_name", "cpu")
