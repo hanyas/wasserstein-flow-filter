@@ -8,22 +8,24 @@ def generate_data(key, x0, T, params):
     nx, ny = 1, 1
 
     s = params
-    trns_mdl, obs_mdl = build_model(params)
+    trans_mdl, obsrv_mdl = build_model(params)
 
     def transition_fcn(key, x):
-        _mu = trns_mdl.mean(x)
-        _sigma = trns_mdl.cov(x)
+        _mu = trans_mdl.mean(x)
+        _sigma = trans_mdl.cov(x)
+        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
-        xn = _mu + jnp.linalg.cholesky(_sigma) @ jax.random.normal(sub_key, shape=(nx,))
+        xn = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(nx,))
         return key, xn
 
     def observation_fcn(key, x):
-        _mu = obs_mdl.mean(x)
-        _sigma = obs_mdl.cov(x)
+        _mu = obsrv_mdl.mean(x)
+        _sigma = obsrv_mdl.cov(x)
+        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
-        y = _mu + jnp.linalg.cholesky(_sigma) @ jax.random.normal(sub_key, shape=(ny,))
+        y = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
         return key, y
 
     def body(carry, args):
@@ -35,7 +37,9 @@ def generate_data(key, x0, T, params):
     key, sub_key = jax.random.split(key, 2)
 
     m0, P0 = x0
-    x0 = m0 + jnp.linalg.cholesky(P0) @ jax.random.normal(sub_key, shape=(nx,))
+    P0_sqrt = jnp.linalg.cholesky(P0)
+    # x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
+    x0 = jnp.array([-3.0])
     (key, _), (Xs, Ys) = jax.lax.scan(body, (key, x0), (), length=T)
 
     Xs = jnp.insert(Xs, 0, x0, 0)
@@ -45,18 +49,18 @@ def generate_data(key, x0, T, params):
 def build_model(params):
     s = params
 
-    def trns_mean(x):
+    def trans_mean(x):
         return x
 
-    def trns_cov(x):
+    def trans_cov(x):
         return jnp.eye(1)
 
-    def obs_mean(x):
+    def obsrv_mean(x):
         return jnp.abs(x)
 
-    def obs_cov(x):
+    def obsrv_cov(x):
         return jnp.eye(1) * s**2
 
-    trns_mdl = ConditionalMVN(trns_mean, trns_cov)
-    obs_mdl = ConditionalMVN(obs_mean, obs_cov)
-    return trns_mdl, obs_mdl
+    trans_mdl = ConditionalMVN(trans_mean, trans_cov)
+    obsrv_mdl = ConditionalMVN(obsrv_mean, obsrv_cov)
+    return trans_mdl, obsrv_mdl

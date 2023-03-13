@@ -8,11 +8,11 @@ def generate_data(key, z0, T, params):
     nz, ny = 2, 1
 
     mu, a, sig, rho = params
-    trns_mdl, obs_mdl = build_model(params)
+    trans_mdl, obsrv_mdl = build_model(params)
 
     def transition_fcn(key, z):
-        _mu = trns_mdl.mean(z)
-        _sigma = trns_mdl.cov(z)
+        _mu = trans_mdl.mean(z)
+        _sigma = trans_mdl.cov(z)
         _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
@@ -20,8 +20,8 @@ def generate_data(key, z0, T, params):
         return key, zn
 
     def observation_fcn(key, z):
-        _mu = obs_mdl.mean(z)
-        _sigma = obs_mdl.cov(z)
+        _mu = obsrv_mdl.mean(z)
+        _sigma = obsrv_mdl.cov(z)
         _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
@@ -48,26 +48,26 @@ def generate_data(key, z0, T, params):
 def build_model(params):
     mu, a, sig, rho = params
 
-    def trns_mean(z):
+    def trans_mean(z):
         x, eta = z
         F = jnp.array([[a, sig], [0.0, 0.0]])
         b = jnp.array([mu * (1.0 - a), 0.0])
         return F @ z + b
 
-    def trns_cov(z):
+    def trans_cov(z):
         x, eta = z
         _cov = jnp.array([1e-32, 1.0])
         return jnp.diag(_cov)
 
-    def obs_mean(z):
+    def obsrv_mean(z):
         x, eta = z
         return jnp.array([rho * eta * jnp.exp(x / 2.0)])
 
-    def obs_cov(z):
+    def obsrv_cov(z):
         x, eta = z
         _cov = jnp.array([(1.0 - rho**2) * jnp.exp(x)])
         return jnp.diag(_cov)
 
-    trns_mdl = ConditionalMVN(trns_mean, trns_cov)
-    obs_mdl = ConditionalMVN(obs_mean, obs_cov)
-    return trns_mdl, obs_mdl
+    trans_mdl = ConditionalMVN(trans_mean, trans_cov)
+    obsrv_mdl = ConditionalMVN(obsrv_mean, obsrv_cov)
+    return trans_mdl, obsrv_mdl

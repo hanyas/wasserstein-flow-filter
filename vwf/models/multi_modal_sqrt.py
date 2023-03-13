@@ -8,19 +8,19 @@ def generate_data(key, x0, T, params):
     nx, ny = 1, 1
 
     s = params
-    trns_mdl, obs_mdl = build_model(params)
+    trans_mdl, obsrv_mdl = build_model(params)
 
     def transition_fcn(key, x):
-        _mu = trns_mdl.mean(x)
-        _sigma_sqrt = trns_mdl.cov_sqrt(x)
+        _mu = trans_mdl.mean(x)
+        _sigma_sqrt = trans_mdl.cov_sqrt(x)
 
         key, sub_key = jax.random.split(key, 2)
         xn = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(nx,))
         return key, xn
 
     def observation_fcn(key, x):
-        _mu = obs_mdl.mean(x)
-        _sigma_sqrt = obs_mdl.cov_sqrt(x)
+        _mu = obsrv_mdl.mean(x)
+        _sigma_sqrt = obsrv_mdl.cov_sqrt(x)
 
         key, sub_key = jax.random.split(key, 2)
         y = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
@@ -46,18 +46,18 @@ def generate_data(key, x0, T, params):
 def build_model(params):
     s = params
 
-    def trns_mean(x):
+    def trans_mean(x):
         return x
 
-    def trns_cov_sqrt(x):
+    def trans_cov_sqrt(x):
         return jnp.eye(1)
 
-    def obs_mean(x):
+    def obsrv_mean(x):
         return jnp.abs(x)
 
-    def obs_cov_sqrt(x):
+    def obsrv_cov_sqrt(x):
         return jnp.eye(1) * s
 
-    trns_mdl = ConditionalMVNSqrt(trns_mean, trns_cov_sqrt)
-    obs_mdl = ConditionalMVNSqrt(obs_mean, obs_cov_sqrt)
-    return trns_mdl, obs_mdl
+    trans_mdl = ConditionalMVNSqrt(trans_mean, trans_cov_sqrt)
+    obsrv_mdl = ConditionalMVNSqrt(obsrv_mean, obsrv_cov_sqrt)
+    return trans_mdl, obsrv_mdl
