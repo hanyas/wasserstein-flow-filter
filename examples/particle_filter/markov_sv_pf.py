@@ -18,36 +18,43 @@ a = 0.975
 sig = jnp.sqrt(0.02)
 rho = -0.8
 
+true_params = jnp.array([mu, a, sig, rho])
+
 m0 = jnp.array([mu, 0.0])
 P0 = jnp.diag(jnp.array([sig**2 / (1 - a**2), 1.0]))
-z0 = MVNStandard(m0, P0)
+init_dist = MVNStandard(m0, P0)
 
-T = 500
-N = 500
+nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
+true_states, observations = generate_data(
+    sub_key, init_dist, nb_steps, true_params
+)
 
-true_params = jnp.array([mu, a, sig, rho])
-Zs, Ys = generate_data(sub_key, z0, T, true_params)
-
-trns_mdl, obs_mdl = build_model(true_params)
-Zf, ell, Ws = jax.jit(particle_filter, static_argnums=(1, 4, 5))(
-    key, N, Ys, z0, trns_mdl, obs_mdl
+nb_particles = 500
+trans_mdl, obsrv_mdl = build_model(true_params)
+filt_states, ell, weights = jax.jit(particle_filter, static_argnums=(1, 4, 5))(
+    key, nb_particles, observations, init_dist, trans_mdl, obsrv_mdl
 )
 print("Likelihood: ", ell)
 
 #
-Zs = onp.array(Zs)
-Zf = onp.array(Zf)
-t = onp.arange(T)
+true_states = onp.array(true_states)
+filt_states = onp.array(filt_states)
+weights = onp.array(weights)
+t = onp.arange(nb_steps)
 
-MEAN = onp.mean(Zf, axis=1)[1:, 0]
-VAR = (onp.average(Zf[1:, :, 0] ** 2, axis=1, weights=Ws) - MEAN**2)
+
+MEAN = onp.average(filt_states[1:, :, 0], axis=1, weights=weights)
+VAR = (
+    onp.average(filt_states[1:, :, 0] ** 2, axis=1, weights=weights)
+    - MEAN**2
+)
 STD = VAR**0.5
 
 plt.figure()
-plt.plot(t, Zs[1:, 0], "k")
+plt.plot(t, true_states[1:, 0], "k")
 plt.plot(t, MEAN, "r")
 plt.fill_between(
     t,

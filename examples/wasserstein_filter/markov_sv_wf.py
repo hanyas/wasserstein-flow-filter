@@ -29,11 +29,11 @@ m0 = jnp.array([mu, 0.0])
 P0 = jnp.diag(jnp.array([sig**2 / (1 - a**2), 1.0]))
 init_dist = MVNStandard(m0, P0)
 
-T = 500
+nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, T, true_params)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
 
 # sigma_points = lambda mu, cov_sqrt: cubature_points(mu, cov_sqrt)
 sigma_points = lambda mu, cov_sqrt: gauss_hermite_points(mu, cov_sqrt, order=5)
@@ -56,7 +56,7 @@ print("Likelihood: ", ell)
 true_state = onp.array(true_states)
 filt_states_mean = onp.array(filt_states.mean)
 filt_states_cov = onp.array(filt_states.cov)
-t = onp.arange(T + 1)
+t = onp.arange(nb_steps + 1)
 
 plt.figure()
 plt.plot(t, true_state[:, 0], "k")

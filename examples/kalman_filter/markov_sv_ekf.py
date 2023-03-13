@@ -3,6 +3,8 @@ import numpy as onp
 import jax.numpy as jnp
 import jax.random
 
+import jaxopt
+
 import matplotlib.pyplot as plt
 
 from vwf.objects import MVNStandard
@@ -18,51 +20,51 @@ a = 0.975
 sig = jnp.sqrt(0.02)
 rho = -0.8
 
+true_params = jnp.array([mu, a, sig, rho])
+
 m0 = jnp.array([mu, 0.0])
 P0 = jnp.diag(jnp.array([sig**2 / (1 - a**2), 1.0]))
-z0 = MVNStandard(m0, P0)
+init_dist = MVNStandard(m0, P0)
 
-T = 500
+nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
 
-true_params = jnp.array([mu, a, sig, rho])
-Zs, Ys = generate_data(sub_key, z0, T, true_params)
-
-trns_mdl, obs_mdl = build_model(true_params)
-Zf, ell = kalman_filter(Ys, z0, trns_mdl, obs_mdl)
+trans_mdl, obsrv_mdl = build_model(true_params)
+filt_states, ell = kalman_filter(observations, init_dist, trans_mdl, obsrv_mdl)
 
 print("Likelihood: ", ell)
 
 #
-Zs = onp.array(Zs)
-Zf = onp.array(Zf)
+true_states = onp.array(true_states)
+filt_states_mean = onp.array(filt_states.mean)
 
 plt.figure()
-plt.plot(Zs[1:, 0], "k")
-plt.plot(Zf.mean[1:, 0], "r")
+plt.plot(true_states[1:, 0], "k")
+plt.plot(filt_states_mean[1:, 0], "r")
 plt.show()
 
 
-# def _tanh(x):
-#     return jnp.clip(jnp.tanh(x), -0.999, 0.999)
-#
-#
-# def _constrain(params):
-#     mu, a_aux, sig_aux, rho_aux = params
-#     a, rho = _tanh(a_aux), _tanh(rho_aux)
-#     sig = jnp.log1p(jnp.exp(sig_aux))
-#     return jnp.array([mu, a, sig, rho])
-#
-#
-# def log_likelihood(params, z0, Ys):
-#     trns_mdl, obs_mdl = build_model(_constrain(params))
-#     _, ell = kalman_filter(Ys, z0, trns_mdl, obs_mdl)
-#     return -ell
-#
-#
-# solver = jaxopt.ScipyMinimize(fun=log_likelihood, tol=1e-4, jit=True)
-# init_params = jnp.array([0.0, 0.0, 0.0, 0.0])
-# res = solver.run(init_params, z0=z0, Ys=Ys)
-# print(_transform(res.params))
+def _tanh(x):
+    return jnp.clip(jnp.tanh(x), -0.999, 0.999)
+
+
+def _constrain(params):
+    mu, a_aux, sig_aux, rho_aux = params
+    a, rho = _tanh(a_aux), _tanh(rho_aux)
+    sig = jnp.log1p(jnp.exp(sig_aux))
+    return jnp.array([mu, a, sig, rho])
+
+
+def log_likelihood(params, observations, init_dist):
+    trans_mdl, obsrv_mdl = build_model(_constrain(params))
+    _, ell = kalman_filter(observations, init_dist, trans_mdl, obsrv_mdl)
+    return -ell
+
+
+solver = jaxopt.ScipyMinimize(fun=log_likelihood, tol=1e-4, jit=True)
+init_params = jnp.array([0.0, 0.0, 0.0, 0.0])
+res = solver.run(init_params, observations=observations, init_dist=init_dist)
+print("Parameter estimate: ", _constrain(res.params))

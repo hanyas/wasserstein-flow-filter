@@ -28,11 +28,11 @@ m0 = jnp.array([mu, 0.0])
 P0_sqrt = jnp.diag(jnp.array([sig / jnp.sqrt(1 - a**2), 1.0]))
 init_dist = MVNSqrt(m0, P0_sqrt)
 
-T = 500
+nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, T, true_params)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
 
 nb_comp = 2
 mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=500)
@@ -65,7 +65,7 @@ print("Likelihood: ", ell)
 true_states = onp.array(true_states)
 filt_states_mean = onp.array(filt_states.mean)
 filt_states_cov_sqrt = onp.array(filt_states.cov_sqrt)
-t = onp.arange(T + 1)
+t = onp.arange(nb_steps + 1)
 
 plt.figure()
 plt.plot(t, true_states[:, 0], "k")

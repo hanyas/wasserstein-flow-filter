@@ -17,20 +17,21 @@ jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 # jax.config.update("jax_disable_jit", True)
 
-s = jnp.array([1.0])
+s = jnp.array([2.5])
 
 m0 = jnp.array([0.0])
 P0_sqrt = jnp.eye(1)
-x0 = MVNSqrt(m0, P0_sqrt)
+init_dist = MVNSqrt(m0, P0_sqrt)
 
-T = 200
+nb_steps = 500
 
-key = jax.random.PRNGKey(444)
+key = jax.random.PRNGKey(131)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, x0, T, s)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, s)
 
 nb_comp = 2
-mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=500)
+nb_samples = 500
+mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=nb_samples)
 
 init_gmm = GMMSqrt(
     jnp.array([[-5.0], [5.0]]),
@@ -56,26 +57,28 @@ print("Likelihood: ", ell)
 
 #
 true_states = onp.array(true_states)
+observations = onp.array(observations)
 filt_states_mean = onp.array(filt_states.mean)
 filt_states_cov_sqrt = onp.array(filt_states.cov_sqrt)
-t = onp.arange(T + 1)
+t = onp.arange(nb_steps + 1)
 
 plt.figure()
-plt.plot(t, true_states[:, 0], "k")
-plt.plot(t, filt_states_mean[:, 0, 0], "red")
-plt.plot(t, filt_states_mean[:, 1, 0], "blue")
+plt.plot(t, true_states[:, 0], "k", linewidth=3.5)
+plt.scatter(t[1:], observations[:, 0], c="tab:green", s=5.0)
+plt.plot(t, filt_states_mean[:, 0, 0], "tab:blue")
+plt.plot(t, filt_states_mean[:, 1, 0], "tab:red")
 plt.fill_between(
     t,
     filt_states_mean[:, 0, 0] - 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
     filt_states_mean[:, 0, 0] + 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
-    color="tab:red",
+    color="tab:blue",
     alpha=0.25,
 )
 plt.fill_between(
     t,
     filt_states_mean[:, 1, 0] - 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
     filt_states_mean[:, 1, 0] + 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
-    color="tab:blue",
+    color="tab:red",
     alpha=0.25,
 )
 plt.show()
