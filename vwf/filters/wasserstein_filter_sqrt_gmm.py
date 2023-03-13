@@ -44,9 +44,11 @@ def log_target(
     observation_model: ConditionalMVNSqrt,
 ):
     k = prior_sqrt.size
+
     ms, Ps_sqrt = prior_sqrt
     Ps = jnp.einsum("nij,nkj->nik", Ps_sqrt, Ps_sqrt)
     prior_logpdf = logsumexp(mvn.logpdf(state, ms, Ps)) - jnp.log(k)
+
     obsrv_logpdf = observation_model.logpdf(state, observation)
     return obsrv_logpdf + prior_logpdf
 
@@ -66,6 +68,7 @@ def ode_step(
 
     def log_ratio(state, mus, sigmas_sqrt):
         _log_target = log_target(state, observation, prior_sqrt, observation_model)
+
         sigmas_x = jnp.einsum("nij,nkj->nik", sigmas_sqrt, sigmas_sqrt)
         log_mixture = logsumexp(mvn.logpdf(state, mus, sigmas_x)) - jnp.log(k)
         return _log_target - log_mixture
@@ -185,6 +188,6 @@ def wasserstein_filter_sqrt_gmm(
     x0 = initial_dist
     ys = observations
 
-    (_, _, ell), xf = jax.lax.scan(body, (key, x0, 0.0), xs=ys)
-    xf = none_or_concat(xf, x0, 1)
-    return xf, ell
+    (_, _, ell), Xf = jax.lax.scan(body, (key, x0, 0.0), xs=ys)
+    Xf = none_or_concat(Xf, x0, 1)
+    return Xf, ell

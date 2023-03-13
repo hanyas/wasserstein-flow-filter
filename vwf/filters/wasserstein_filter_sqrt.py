@@ -156,6 +156,6 @@ def wasserstein_filter_sqrt(
     x0 = initial_dist
     ys = observations
 
-    (_, ell), xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
-    xf = none_or_concat(xf, x0, 1)
-    return xf, ell
+    (_, ell), Xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
+    Xf = none_or_concat(Xf, x0, 1)
+    return Xf, ell
