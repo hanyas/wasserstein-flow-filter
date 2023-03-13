@@ -47,12 +47,12 @@ def particle_filter(
 ):
     N = nb_particles
 
-    def _propagate(x, q, trns_mdl):
-        xn = trns_mdl.mean(x) + jnp.linalg.cholesky(trns_mdl.cov(x)) @ q
+    def _propagate(x, q, trans_mdl):
+        xn = trans_mdl.mean(x) + jnp.linalg.cholesky(trans_mdl.cov(x)) @ q
         return xn
 
-    def _log_weights(x, y, obs_mdl):
-        return obs_mdl.logpdf(x, y)
+    def _log_weights(x, y, obsrv_mdl):
+        return obsrv_mdl.logpdf(x, y)
 
     def body(carry, args):
         x, ell = carry
@@ -119,12 +119,14 @@ def non_markov_particle_filter(
 ):
     N = nb_particles
 
-    def _propagate(x, y, q, trns_mdl):
-        xn = trns_mdl.mean(x, y) + jnp.linalg.cholesky(trns_mdl.cov(x, y)) @ q
+    def _propagate(x, y, q, trans_mdl):
+        _mu = trans_mdl.mean(x, y)
+        _sigma_sqrt = jnp.linalg.cholesky(trans_mdl.cov(x, y))
+        xn = _mu + _sigma_sqrt @ q
         return xn
 
-    def _log_weights(x, y, obs_mdl):
-        return obs_mdl.logpdf(x, y)
+    def _log_weights(x, y, obsrv_mdl):
+        return obsrv_mdl.logpdf(x, y)
 
     def body(carry, args):
         x, ell = carry
