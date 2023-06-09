@@ -5,7 +5,10 @@ import jax.random
 
 from wasserstein_filter.objects import MVNStandard
 from wasserstein_filter.filters import wasserstein_filter
-from wasserstein_filter.models.markov_stochastic_volatility import build_model, generate_data
+from wasserstein_filter.models.markov_stochastic_volatility import (
+    build_model,
+    generate_data,
+)
 
 from wasserstein_filter.sigma_points import cubature_points
 from wasserstein_filter.sigma_points import gauss_hermite_points
@@ -33,15 +36,15 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
+true_states, observations = generate_data(
+    sub_key, init_dist, nb_steps, true_params
+)
 
 # sigma_points = lambda mu, cov_sqrt: cubature_points(mu, cov_sqrt)
 sigma_points = lambda mu, cov_sqrt: gauss_hermite_points(mu, cov_sqrt, order=5)
 
 trans_model, obsrv_model = build_model(true_params)
-filt_states, ell = jax.jit(
-    wasserstein_filter, static_argnums=(2, 3, 4, 5, 6)
-)(
+filt_states, ell = jax.jit(wasserstein_filter, static_argnums=(2, 3, 4, 5, 6))(
     observations,
     init_dist,
     trans_model,
@@ -63,8 +66,8 @@ plt.plot(t, true_state[:, 0], "k")
 plt.plot(t, filt_states_mean[:, 0], "r")
 plt.fill_between(
     t,
-    filt_states_mean[:, 0] - 2. * filt_states_cov[:, 0, 0]**0.5,
-    filt_states_mean[:, 0] + 2. * filt_states_cov[:, 0, 0]**0.5,
+    filt_states_mean[:, 0] - 2.0 * filt_states_cov[:, 0, 0] ** 0.5,
+    filt_states_mean[:, 0] + 2.0 * filt_states_cov[:, 0, 0] ** 0.5,
     color="tab:red",
     alpha=0.25,
 )

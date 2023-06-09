@@ -31,7 +31,9 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
+true_states, observations = generate_data(
+    sub_key, init_dist, nb_steps, true_params
+)
 
 nb_particles = 500
 trans_mdl, obsrv_mdl = build_model(true_params)
@@ -47,7 +49,7 @@ weights = onp.array(weights)
 t = onp.arange(nb_steps + 1)
 
 MEAN = onp.average(filt_states[..., 0], axis=-1, weights=weights)
-VAR = onp.average(filt_states[..., 0]**2, axis=-1, weights=weights) - MEAN**2
+VAR = onp.average(filt_states[..., 0] ** 2, axis=-1, weights=weights) - MEAN**2
 STD = VAR**0.5
 
 plt.figure()

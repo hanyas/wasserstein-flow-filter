@@ -33,7 +33,9 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
+true_states, observations = generate_data(
+    sub_key, init_dist, nb_steps, true_params
+)
 
 trans_mdl, obsrv_mdl = build_model(true_params)
 filt_states, ell = kalman_filter(observations, init_dist, trans_mdl, obsrv_mdl)

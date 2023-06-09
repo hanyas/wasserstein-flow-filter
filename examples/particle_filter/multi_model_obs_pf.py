@@ -5,7 +5,10 @@ import jax.random
 
 from wasserstein_filter.objects import MVNStandard
 from wasserstein_filter.filters import particle_filter
-from wasserstein_filter.models.multi_modal_obs import build_model, generate_data
+from wasserstein_filter.models.multi_modal_obs import (
+    build_model,
+    generate_data,
+)
 
 import matplotlib.pyplot as plt
 
@@ -39,11 +42,11 @@ observations = onp.array(observations)
 filt_states = onp.array(filt_states)
 
 t = onp.arange(nb_steps + 1)
-xf_pos_mean = onp.array([x[x >= 0.].mean() for x in filt_states])
-xf_neg_mean = onp.array([x[x < 0.].mean() for x in filt_states])
+xf_pos_mean = onp.array([x[x >= 0.0].mean() for x in filt_states])
+xf_neg_mean = onp.array([x[x < 0.0].mean() for x in filt_states])
 
-xf_pos_std = onp.array([x[x >= 0.].std() for x in filt_states])
-xf_neg_std = onp.array([x[x < 0.].std() for x in filt_states])
+xf_pos_std = onp.array([x[x >= 0.0].std() for x in filt_states])
+xf_neg_std = onp.array([x[x < 0.0].std() for x in filt_states])
 
 plt.figure()
 plt.plot(t, true_states, "k", linewidth=3.5)
