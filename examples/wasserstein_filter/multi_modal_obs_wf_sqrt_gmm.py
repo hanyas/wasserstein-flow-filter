@@ -3,19 +3,22 @@ import numpy as onp
 import jax.numpy as jnp
 import jax.random
 
-import jaxopt
-import matplotlib.pyplot as plt
-
 from wasserstein_filter.objects import MVNSqrt, GMMSqrt
 from wasserstein_filter.filters import wasserstein_filter_sqrt_gmm
-from wasserstein_filter.models.multi_modal_obs_sqrt import build_model, generate_data
+from wasserstein_filter.models.multi_modal_obs_sqrt import (
+    build_model,
+    generate_data,
+)
 
 from wasserstein_filter.sigma_points import monte_carlo_points
 from wasserstein_filter.utils import euler_odeint
 
+import matplotlib.pyplot as plt
+
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 # jax.config.update("jax_disable_jit", True)
+
 
 s = jnp.array([2.5])
 
@@ -31,7 +34,14 @@ true_states, observations = generate_data(sub_key, init_dist, nb_steps, s)
 
 nb_comp = 2
 nb_samples = 500
-mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=nb_samples)
+
+
+def mc_points(key):
+    _sub_keys = jax.random.split(key, nb_comp + 1)
+    return _sub_keys[0], jax.vmap(monte_carlo_points, in_axes=(0, None, None))(
+        _sub_keys[1:], 1, nb_samples
+    )
+
 
 init_gmm = GMMSqrt(
     jnp.array([[-5.0], [5.0]]),

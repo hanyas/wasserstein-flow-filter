@@ -7,11 +7,9 @@ from jax.flatten_util import ravel_pytree
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
-from jax.experimental.ode import odeint
 
 from wasserstein_filter.objects import GMMSqrt, ConditionalMVNSqrt
 from wasserstein_filter.utils import fixed_point, rk4_odeint, euler_odeint
-from wasserstein_filter.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from wasserstein_filter.utils import tria_qr, tria_tril
 from wasserstein_filter.utils import none_or_concat
 
@@ -21,14 +19,14 @@ def linearize(model: ConditionalMVNSqrt, x: GMMSqrt):
     ms, _ = x
 
     Fs = jax.vmap(jax.jacfwd(mean_fcn))(ms)
-    bs = jax.vmap(mean_fcn)(ms) - jnp.einsum("nij,nj->ni", Fs, ms)
+    bs = jax.vmap(mean_fcn)(ms) - jnp.einsum("kij,kj->ki", Fs, ms)
     Qs_sqrt = jax.vmap(cov_sqrt_fcn)(ms)
     return Fs, bs, Qs_sqrt
 
 
 def predict(Fs, bs, Qs_sqrt, x):
     ms, Ps_sqrt = x
-    ms = jnp.einsum("nij,nj->ni", Fs, ms) + bs
+    ms = jnp.einsum("kij,kj->ki", Fs, ms) + bs
 
     def _tria_fcn(F, P_sqrt, Q_sqrt):
         return tria_qr(jnp.concatenate([F @ P_sqrt, Q_sqrt], axis=1))
@@ -37,7 +35,7 @@ def predict(Fs, bs, Qs_sqrt, x):
     return GMMSqrt(ms, Ps_sqrt)
 
 
-def log_target(
+def log_posterior(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior_sqrt: GMMSqrt,
@@ -46,8 +44,8 @@ def log_target(
     k = prior_sqrt.size
 
     ms, Ps_sqrt = prior_sqrt
-    Ps = jnp.einsum("nij,nkj->nik", Ps_sqrt, Ps_sqrt)
-    prior_logpdf = logsumexp(mvn.logpdf(state, ms, Ps)) - jnp.log(k)
+    Ps = jnp.einsum("kij,knj->kin", Ps_sqrt, Ps_sqrt)
+    prior_logpdf = logsumexp(mvn.logpdf(state, ms, Ps))
 
     obsrv_logpdf = observation_model.logpdf(state, observation)
     return obsrv_logpdf + prior_logpdf
@@ -67,18 +65,18 @@ def ode_step(
     k = dist_sqrt.size
 
     def log_ratio(state, mus, sigmas_sqrt):
-        _log_target = log_target(state, observation, prior_sqrt, observation_model)
+        _log_target = log_posterior(state, observation, prior_sqrt, observation_model)
 
-        sigmas_x = jnp.einsum("nij,nkj->nik", sigmas_sqrt, sigmas_sqrt)
+        sigmas_x = jnp.einsum("kij,knj->kin", sigmas_sqrt, sigmas_sqrt)
         log_mixture = logsumexp(mvn.logpdf(state, mus, sigmas_x)) - jnp.log(k)
         return _log_target - log_mixture
 
-    gradV = jax.grad(log_ratio)
-    hessV = jax.hessian(log_ratio)
+    gradP = jax.grad(log_ratio)
+    hessP = jax.hessian(log_ratio)
 
     _dist_sqrt, _unflatten = ravel_pytree(dist_sqrt)
 
-    key, rvs, ws = monte_carlo(key)
+    key, (rvs, ws) = monte_carlo(key)
 
     def _ode(t, x):
         mus, sigmas_sqrt = _unflatten(x)
@@ -86,19 +84,19 @@ def ode_step(
         zs = mus[:, None, :] + jnp.einsum("kij,knj->kni", sigmas_sqrt, rvs)
 
         def _grad_fcn(zs, mus, sigmas_sqrt):
-            return jax.vmap(gradV, in_axes=(0, None, None))(
+            return jax.vmap(gradP, in_axes=(0, None, None))(
                 zs, mus, sigmas_sqrt
             )
 
-        dV = jax.vmap(_grad_fcn, in_axes=(0, None, None))(zs, mus, sigmas_sqrt)
+        dP = jax.vmap(_grad_fcn, in_axes=(0, None, None))(zs, mus, sigmas_sqrt)
 
-        def _sigma_dt_fcn(z, w, mu, dV):
+        def _sigma_dt_fcn(z, w, mu, dP):
             return (
-                jnp.einsum("ni,nj,n->ij", dV, z - mu, w)
-                + jnp.einsum("ni,nj,n->ij", z - mu, dV, w)
+                jnp.einsum("ni,nj,n->ij", dP, z - mu, w)
+                + jnp.einsum("ni,nj,n->ij", z - mu, dP, w)
             )
 
-        sigmas_dt = jax.vmap(_sigma_dt_fcn)(zs, ws, mus, dV)
+        sigmas_dt = jax.vmap(_sigma_dt_fcn)(zs, ws, mus, dP)
 
         def _sigma_sqrt_dt_fcn(sigma_sqrt, sigma_dt):
             sigma_sqrt_inv = jnp.linalg.inv(sigma_sqrt)
@@ -106,7 +104,7 @@ def ode_step(
                 sigma_sqrt_inv @ sigma_dt @ sigma_sqrt_inv.T
             )
 
-        mus_dt = jnp.einsum("kni,kn->ki", dV, ws)
+        mus_dt = jnp.einsum("kni,kn->ki", dP, ws)
         sigmas_sqrt_dt = jax.vmap(_sigma_sqrt_dt_fcn)(sigmas_sqrt, sigmas_dt)
 
         dx_dt = GMMSqrt(mus_dt, sigmas_sqrt_dt)
@@ -175,7 +173,7 @@ def wasserstein_filter_sqrt_gmm(
 
         # ell
         mus, sigmas_sqrt = xp
-        key, rvs, ws = monte_carlo(key)
+        key, (rvs, ws) = monte_carlo(key)
         zs = mus[:, None, :] + jnp.einsum("kij,knj->kni", sigmas_sqrt, rvs)
 
         def _ell(z, w):
