@@ -6,11 +6,9 @@ from jax.flatten_util import ravel_pytree
 
 import jax.numpy as jnp
 from jax.scipy.stats import multivariate_normal as mvn
-from jax.experimental.ode import odeint
 
 from wasserstein_filter.objects import MVNSqrt, ConditionalMVNSqrt
 from wasserstein_filter.utils import fixed_point, rk4_odeint, euler_odeint
-from wasserstein_filter.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
 from wasserstein_filter.utils import tria_qr, tria_tril
 from wasserstein_filter.utils import none_or_concat
 
@@ -32,8 +30,7 @@ def predict(F, b, Q_sqrt, x):
     return MVNSqrt(m, P_sqrt)
 
 
-def log_target(
-    # Log-target is the negative potential V
+def log_posterior(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior_sqrt: MVNSqrt,
@@ -56,7 +53,7 @@ def ode_step(
     step_size: float,
 ):
     d = dist_sqrt.dim
-    gradV = jax.grad(log_target)
+    gradP = jax.grad(log_posterior)
 
     _dist_sqrt, _unflatten = ravel_pytree(dist_sqrt)
 
@@ -65,29 +62,25 @@ def ode_step(
 
         z, w = sigma_points(mu, sigma_sqrt)
 
-        dV = jax.vmap(gradV, in_axes=(0, None, None, None))(
+        dP = jax.vmap(gradP, in_axes=(0, None, None, None))(
             z, observation, prior_sqrt, observation_model
         )
 
         sigma_dt = (
             2.0 * jnp.eye(d)
-            + jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
-            + jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
+            + jnp.einsum("nk,nh,n->kh", dP, z - mu, w)
+            + jnp.einsum("nk,nh,n->kh", z - mu, dP, w)
         )
 
         sigma_sqrt_inv = jnp.linalg.inv(sigma_sqrt)
 
-        mu_dt = jnp.einsum("nk,n->k", dV, w)
+        mu_dt = jnp.einsum("nk,n->k", dP, w)
         sigma_sqrt_dt = sigma_sqrt @ tria_tril(
             sigma_sqrt_inv @ sigma_dt @ sigma_sqrt_inv.T
         )
 
         dx_dt = MVNSqrt(mu_dt, sigma_sqrt_dt)
         return ravel_pytree(dx_dt)[0]
-
-    # t = jnp.linspace(0.0, dt, 2)
-    # _ode_flp = lambda t, x: _ode(x, t)
-    # _dist_sqrt = odeint(_ode_flp, _dist_sqrt, t)[-1, :]
 
     _dist_sqrt = integrator(func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
     return _unflatten(_dist_sqrt)
