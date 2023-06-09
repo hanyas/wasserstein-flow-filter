@@ -38,10 +38,10 @@ def generate_data(key, prior, length, params):
 
     m0, P0 = prior
     P0_sqrt = jnp.linalg.cholesky(P0)
-    x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nz,))
-    (key, _), (Zs, Ys) = jax.lax.scan(body, (key, prior), (), length=length)
+    z0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nz,))
+    (key, _), (Zs, Ys) = jax.lax.scan(body, (key, z0), (), length=length)
 
-    Zs = jnp.insert(Zs, 0, prior, 0)
+    Zs = jnp.insert(Zs, 0, z0, 0)
     return Zs, Ys
 
 
