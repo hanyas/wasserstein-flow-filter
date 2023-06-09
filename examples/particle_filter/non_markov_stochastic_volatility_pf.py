@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 
+
 mu = 0.5
 a = 0.975
 sig = jnp.sqrt(0.02)

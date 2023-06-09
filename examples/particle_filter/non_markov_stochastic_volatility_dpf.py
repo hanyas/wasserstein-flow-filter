@@ -31,6 +31,7 @@ os.environ["XLA_FLAGS"] = (
     "--xla_cpu_multi_thread_eigen=false " "intra_op_parallelism_threads=1"
 )
 
+
 mu = 0.5
 a = 0.975
 sig = jnp.sqrt(0.02)
