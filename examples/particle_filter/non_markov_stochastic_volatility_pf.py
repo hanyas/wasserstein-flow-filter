@@ -3,13 +3,16 @@ import numpy as onp
 import jax.numpy as jnp
 import jax.random
 
-import matplotlib.pyplot as plt
-
-from vwf.objects import MVNStandard
-from vwf.filters import (
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import (
     non_markov_stratified_particle_filter as particle_filter,
 )
-from vwf.models.non_markov_sv import build_model, generate_data
+from wasserstein_filter.models.non_markov_stochastic_volatility import (
+    build_model,
+    generate_data,
+)
+
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -47,10 +50,7 @@ weights = onp.array(weights)
 t = onp.arange(nb_steps)
 
 MEAN = onp.average(filt_states[..., 0], axis=1, weights=weights)
-VAR = (
-    onp.average(filt_states[..., 0] ** 2, axis=1, weights=weights)
-    - MEAN**2
-)
+VAR = onp.average(filt_states[..., 0] ** 2, axis=1, weights=weights) - MEAN**2
 STD = VAR**0.5
 
 plt.figure()

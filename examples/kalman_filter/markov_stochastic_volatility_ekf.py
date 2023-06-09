@@ -5,11 +5,14 @@ import jax.random
 
 import jaxopt
 
-import matplotlib.pyplot as plt
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import kalman_filter
+from wasserstein_filter.models.markov_stochastic_volatility import (
+    build_model,
+    generate_data,
+)
 
-from vwf.objects import MVNStandard
-from vwf.filters import kalman_filter
-from vwf.models.markov_sv import build_model, generate_data
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)

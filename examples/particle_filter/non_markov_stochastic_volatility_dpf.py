@@ -8,6 +8,15 @@ import jax.random
 
 import jaxopt
 
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import (
+    non_markov_diffable_particle_filter as particle_filter,
+)
+from wasserstein_filter.models.non_markov_stochastic_volatility import (
+    build_model,
+    generate_data,
+)
+
 import dask
 from dask import delayed
 from dask.diagnostics import ProgressBar
@@ -15,10 +24,6 @@ from dask.diagnostics import ProgressBar
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
-from vwf.objects import MVNStandard
-from vwf.filters import non_markov_diffable_particle_filter as particle_filter
-from vwf.models.non_markov_sv import build_model, generate_data
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -58,11 +63,8 @@ filt_states = onp.array(filt_states)
 weights = onp.array(weights)
 t = onp.arange(nb_steps)
 
-MEAN = onp.average(filt_states[..., 0], axis=1, weights=weights)
-VAR = (
-    onp.average(filt_states[..., 0] ** 2, axis=1, weights=weights)
-    - MEAN**2
-)
+MEAN = onp.average(filt_states[..., 0], axis=-1, weights=weights)
+VAR = onp.average(filt_states[..., 0]**2, axis=-1, weights=weights) - MEAN**2
 STD = VAR**0.5
 
 plt.figure()

@@ -6,45 +6,39 @@ import jax.random
 import jaxopt
 import matplotlib.pyplot as plt
 
-from vwf.objects import MVNSqrt, GMMSqrt
-from vwf.filters import wasserstein_filter_sqrt_gmm
-from vwf.models.markov_sv_sqrt import build_model, generate_data
+from wasserstein_filter.objects import MVNSqrt, GMMSqrt
+from wasserstein_filter.filters import wasserstein_filter_sqrt_gmm
+from wasserstein_filter.models.multi_modal_obs_sqrt import build_model, generate_data
 
-from vwf.sigma_points import monte_carlo_points
-from vwf.utils import euler_odeint
+from wasserstein_filter.sigma_points import monte_carlo_points
+from wasserstein_filter.utils import euler_odeint
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 # jax.config.update("jax_disable_jit", True)
 
-mu = 0.5
-a = 0.975
-sig = jnp.sqrt(0.02)
-rho = -0.8
+s = jnp.array([2.5])
 
-true_params = jnp.array([mu, a, sig, rho])
-
-m0 = jnp.array([mu, 0.0])
-P0_sqrt = jnp.diag(jnp.array([sig / jnp.sqrt(1 - a**2), 1.0]))
+m0 = jnp.array([0.0])
+P0_sqrt = jnp.eye(1)
 init_dist = MVNSqrt(m0, P0_sqrt)
 
 nb_steps = 500
 
-key = jax.random.PRNGKey(123)
+key = jax.random.PRNGKey(131)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, s)
 
 nb_comp = 2
-mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=500)
+nb_samples = 500
+mc_points = lambda key: monte_carlo_points(key, dim=1, nb_comp=nb_comp, nb_samples=nb_samples)
 
-key, sub_key = jax.random.split(key, 2)
-jitter = jax.random.normal(sub_key, (nb_comp, 2))
 init_gmm = GMMSqrt(
-    jnp.repeat(m0[None, :], nb_comp, axis=0) + jitter,
+    jnp.array([[-5.0], [5.0]]),
     jnp.repeat(P0_sqrt[None, :], nb_comp, axis=0),
 )
 
-trans_model, obsrv_model = build_model(true_params)
+trans_model, obsrv_model = build_model(s)
 
 key, sub_key = jax.random.split(key, 2)
 filt_states, ell = jax.jit(
@@ -63,26 +57,28 @@ print("Likelihood: ", ell)
 
 #
 true_states = onp.array(true_states)
+observations = onp.array(observations)
 filt_states_mean = onp.array(filt_states.mean)
 filt_states_cov_sqrt = onp.array(filt_states.cov_sqrt)
 t = onp.arange(nb_steps + 1)
 
 plt.figure()
-plt.plot(t, true_states[:, 0], "k")
-plt.plot(t, filt_states_mean[:, 0, 0], "red")
-plt.plot(t, filt_states_mean[:, 1, 0], "blue")
+plt.plot(t, true_states[:, 0], "k", linewidth=3.5)
+plt.scatter(t[1:], observations[:, 0], c="tab:green", s=5.0)
+plt.plot(t, filt_states_mean[:, 0, 0], "tab:blue")
+plt.plot(t, filt_states_mean[:, 1, 0], "tab:red")
 plt.fill_between(
     t,
     filt_states_mean[:, 0, 0] - 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
     filt_states_mean[:, 0, 0] + 2.0 * filt_states_cov_sqrt[:, 0, 0, 0],
-    color="tab:red",
+    color="tab:blue",
     alpha=0.25,
 )
 plt.fill_between(
     t,
     filt_states_mean[:, 1, 0] - 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
     filt_states_mean[:, 1, 0] + 2.0 * filt_states_cov_sqrt[:, 1, 0, 0],
-    color="tab:blue",
+    color="tab:red",
     alpha=0.25,
 )
 plt.show()

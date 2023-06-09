@@ -5,9 +5,9 @@ import jax.random
 
 import matplotlib.pyplot as plt
 
-from vwf.objects import MVNStandard
-from vwf.filters import particle_filter
-from vwf.models.multi_modal import build_model, generate_data
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import particle_filter
+from wasserstein_filter.models.multi_modal_obs import build_model, generate_data
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)

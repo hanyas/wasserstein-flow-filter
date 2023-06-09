@@ -5,13 +5,13 @@ import jax.random
 
 import matplotlib.pyplot as plt
 
-from vwf.objects import MVNStandard
-from vwf.filters import wasserstein_filter
-from vwf.models.markov_sv import build_model, generate_data
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import wasserstein_filter
+from wasserstein_filter.models.markov_stochastic_volatility import build_model, generate_data
 
-from vwf.sigma_points import cubature_points
-from vwf.sigma_points import gauss_hermite_points
-from vwf.utils import euler_odeint
+from wasserstein_filter.sigma_points import cubature_points
+from wasserstein_filter.sigma_points import gauss_hermite_points
+from wasserstein_filter.utils import euler_odeint
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)

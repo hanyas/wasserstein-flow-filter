@@ -3,11 +3,14 @@ import numpy as onp
 import jax.numpy as jnp
 import jax.random
 
-import matplotlib.pyplot as plt
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.filters import particle_filter
+from wasserstein_filter.models.markov_stochastic_volatility import (
+    build_model,
+    generate_data,
+)
 
-from vwf.objects import MVNStandard
-from vwf.filters import particle_filter
-from vwf.models.markov_sv import build_model, generate_data
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -28,9 +31,7 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
-true_states, observations = generate_data(
-    sub_key, init_dist, nb_steps, true_params
-)
+true_states, observations = generate_data(sub_key, init_dist, nb_steps, true_params)
 
 nb_particles = 500
 trans_mdl, obsrv_mdl = build_model(true_params)
@@ -43,18 +44,14 @@ print("Likelihood: ", ell)
 true_states = onp.array(true_states)
 filt_states = onp.array(filt_states)
 weights = onp.array(weights)
-t = onp.arange(nb_steps)
+t = onp.arange(nb_steps + 1)
 
-
-MEAN = onp.average(filt_states[1:, :, 0], axis=1, weights=weights)
-VAR = (
-    onp.average(filt_states[1:, :, 0] ** 2, axis=1, weights=weights)
-    - MEAN**2
-)
+MEAN = onp.average(filt_states[..., 0], axis=-1, weights=weights)
+VAR = onp.average(filt_states[..., 0]**2, axis=-1, weights=weights) - MEAN**2
 STD = VAR**0.5
 
 plt.figure()
-plt.plot(t, true_states[1:, 0], "k")
+plt.plot(t, true_states[..., 0], "k")
 plt.plot(t, MEAN, "r")
 plt.fill_between(
     t,
