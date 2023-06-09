@@ -8,15 +8,8 @@ from jax.flatten_util import ravel_pytree
 
 from jax.scipy.special import logsumexp
 
-from vwf.objects import MVNStandard
-from vwf.objects import ConditionalMVN
-
-
-def _stratified_resampling(x, w, u):
-    N = w.shape[0]
-    cs = jnp.cumsum(w)
-    idx = jnp.searchsorted(cs, u, side="left")
-    return x[jnp.clip(idx, 0, N - 1)]
+from wasserstein_filter.objects import MVNStandard
+from wasserstein_filter.objects import ConditionalMVN
 
 
 def _avg_n_nplusone(x):
@@ -27,13 +20,20 @@ def _avg_n_nplusone(x):
     return y
 
 
-def _continuous_resampling(x, w, u):
+def continuous_resampling(x, w, u):
     _x, _unravel_fcn = ravel_pytree(x)
     idx = jnp.argsort(_x)
     _xs, ws = _x[idx], w[idx]
     cs = jnp.cumsum(_avg_n_nplusone(ws))
     cs = cs[:-1]
     return _unravel_fcn(jnp.interp(u, cs, _xs))
+
+
+def stratified_resampling(x, w, u):
+    N = w.shape[0]
+    cs = jnp.cumsum(w)
+    idx = jnp.searchsorted(cs, u, side="left")
+    return x[jnp.clip(idx, 0, N - 1)]
 
 
 def particle_filter(
@@ -43,7 +43,7 @@ def particle_filter(
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
     observation_model: ConditionalMVN,
-    resampling_scheme: Callable = _stratified_resampling,
+    resampling_scheme: Callable = stratified_resampling,
 ):
     N = nb_particles
 
@@ -68,13 +68,13 @@ def particle_filter(
 
         # normalize
         log_wn_norm = logsumexp(log_wn)
-        wn = jnp.exp(log_wn - log_wn_norm)  # normalize
+        wn = jnp.exp(log_wn - log_wn_norm)
 
         # ell
         ell += log_wn_norm - jnp.log(N)
 
         # resample
-        xn = _stratified_resampling(xn, wn, u)
+        xn = stratified_resampling(xn, wn, u)
         return (xn, ell), (xn, wn)
 
     m0, P0 = initial_dist
@@ -104,7 +104,9 @@ def particle_filter(
 
     (_, ell), (Xs, Ws) = jax.lax.scan(body, (x0, 0.0), (y, q, u))
 
+    w0 = jnp.ones((N, )) / N
     Xs = jnp.insert(Xs, 0, x0, 0)
+    Ws = jnp.insert(Ws, 0, w0, 0)
     return Xs, ell, Ws
 
 
@@ -115,7 +117,7 @@ def non_markov_particle_filter(
     initial_dist: MVNStandard,
     transition_model: ConditionalMVN,
     observation_model: ConditionalMVN,
-    resampling_scheme: Callable = _stratified_resampling,
+    resampling_scheme: Callable = stratified_resampling,
 ):
     N = nb_particles
 
@@ -139,7 +141,7 @@ def non_markov_particle_filter(
 
         # normalize
         log_w_norm = logsumexp(log_w)
-        w = jnp.exp(log_w - log_w_norm)  # normalize
+        w = jnp.exp(log_w - log_w_norm)
 
         # ell
         ell += log_w_norm - jnp.log(N)
@@ -197,7 +199,7 @@ def non_markov_stratified_particle_filter(
         initial_dist,
         transition_model,
         observation_model,
-        _stratified_resampling,
+        stratified_resampling,
     )
 
 
@@ -216,5 +218,5 @@ def non_markov_diffable_particle_filter(
         initial_dist,
         transition_model,
         observation_model,
-        _continuous_resampling,
+        continuous_resampling,
     )

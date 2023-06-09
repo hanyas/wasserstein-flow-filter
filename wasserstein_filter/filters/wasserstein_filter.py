@@ -6,12 +6,10 @@ from jax.flatten_util import ravel_pytree
 
 import jax.numpy as jnp
 from jax.scipy.stats import multivariate_normal as mvn
-from jax.experimental.ode import odeint
 
-from vwf.objects import MVNStandard, ConditionalMVN
-from vwf.utils import fixed_point, rk4_odeint, euler_odeint
-from vwf.utils import kullback_leibler_mvn_cond, wasserstein_mvn_cond
-from vwf.utils import none_or_concat
+from wasserstein_filter.objects import MVNStandard, ConditionalMVN
+from wasserstein_filter.utils import fixed_point, rk4_odeint, euler_odeint
+from wasserstein_filter.utils import none_or_concat
 
 
 def linearize(model: ConditionalMVN, x: MVNStandard):
@@ -31,8 +29,7 @@ def predict(F, b, Q, x):
     return MVNStandard(m, P)
 
 
-def log_target(
-    # Log-target is the negative potential V
+def log_posterior(
     state: jnp.ndarray,
     observation: jnp.ndarray,
     prior: MVNStandard,
@@ -55,7 +52,7 @@ def ode_step(
     step_size: float,
 ):
     d = dist.dim
-    gradV = jax.grad(log_target)
+    gradP = jax.grad(log_posterior)
 
     _dist, _unflatten = ravel_pytree(dist)
 
@@ -64,15 +61,15 @@ def ode_step(
 
         z, w = sigma_points(mu, jnp.linalg.cholesky(sigma))
 
-        dV = jax.vmap(gradV, in_axes=(0, None, None, None))(
+        dP = jax.vmap(gradP, in_axes=(0, None, None, None))(
             z, observation, prior, observation_model
         )
 
-        mu_dt = jnp.einsum("nk,n->k", dV, w)
+        mu_dt = jnp.einsum("nk,n->k", dP, w)
         sigma_dt = (
             2.0 * jnp.eye(d)
-            + jnp.einsum("nk,nh,n->kh", dV, z - mu, w)
-            + jnp.einsum("nk,nh,n->kh", z - mu, dV, w)
+            + jnp.einsum("nk,nh,n->kh", dP, z - mu, w)
+            + jnp.einsum("nk,nh,n->kh", z - mu, dP, w)
         )
 
         dx_dt = MVNStandard(mu_dt, sigma_dt)

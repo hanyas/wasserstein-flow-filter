@@ -9,11 +9,11 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
 from jax.experimental.ode import odeint
 
-from vwf.objects import GMMSqrt, ConditionalMVNSqrt
-from vwf.utils import fixed_point, rk4_odeint, euler_odeint
-from vwf.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
-from vwf.utils import tria_qr, tria_tril
-from vwf.utils import none_or_concat
+from wasserstein_filter.objects import GMMSqrt, ConditionalMVNSqrt
+from wasserstein_filter.utils import fixed_point, rk4_odeint, euler_odeint
+from wasserstein_filter.utils import kullback_leibler_mvn_sqrt_cond, wasserstein_mvn_sqrt_cond
+from wasserstein_filter.utils import tria_qr, tria_tril
+from wasserstein_filter.utils import none_or_concat
 
 
 def linearize(model: ConditionalMVNSqrt, x: GMMSqrt):

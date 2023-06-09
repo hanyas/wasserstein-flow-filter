@@ -21,6 +21,11 @@ class MVNSqrt(NamedTuple):
     def dim(self):
         return self.mean.shape[-1]
 
+    def logpdf(self, x):
+        mu = self.mean
+        sigma = self.cov_sqrt @ self.cov_sqrt.T
+        return mvn.logpdf(x, mu, sigma)
+
 
 class GMMSqrt(NamedTuple):
     mean: jnp.array

@@ -1,10 +1,10 @@
 import jax
 from jax import numpy as jnp
 
-from vwf.objects import ConditionalMVN
+from wasserstein_filter.objects import ConditionalMVNSqrt
 
 
-def generate_data(key, z0, T, params):
+def generate_data(key, prior, length, params):
     nz, ny = 2, 1
 
     mu, a, sig, rho = params
@@ -12,8 +12,7 @@ def generate_data(key, z0, T, params):
 
     def transition_fcn(key, z):
         _mu = trans_mdl.mean(z)
-        _sigma = trans_mdl.cov(z)
-        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
+        _sigma_sqrt = trans_mdl.cov_sqrt(z)
 
         key, sub_key = jax.random.split(key, 2)
         zn = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(nz,))
@@ -21,8 +20,7 @@ def generate_data(key, z0, T, params):
 
     def observation_fcn(key, z):
         _mu = obsrv_mdl.mean(z)
-        _sigma = obsrv_mdl.cov(z)
-        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
+        _sigma_sqrt = obsrv_mdl.cov_sqrt(z)
 
         key, sub_key = jax.random.split(key, 2)
         y = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
@@ -36,10 +34,9 @@ def generate_data(key, z0, T, params):
 
     key, sub_key = jax.random.split(key, 2)
 
-    m0, P0 = z0
-    P0_sqrt = jnp.linalg.cholesky(P0)
+    m0, P0_sqrt = prior
     z0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nz,))
-    (key, _), (Zs, Ys) = jax.lax.scan(body, (key, z0), (), length=T)
+    (key, _), (Zs, Ys) = jax.lax.scan(body, (key, z0), (), length=length)
 
     Zs = jnp.insert(Zs, 0, z0, 0)
     return Zs, Ys
@@ -54,20 +51,20 @@ def build_model(params):
         b = jnp.array([mu * (1.0 - a), 0.0])
         return F @ z + b
 
-    def trans_cov(z):
+    def trans_cov_sqrt(z):
         x, eta = z
         _cov = jnp.array([1e-32, 1.0])
-        return jnp.diag(_cov)
+        return jnp.diag(jnp.sqrt(_cov))
 
     def obsrv_mean(z):
         x, eta = z
         return jnp.array([rho * eta * jnp.exp(x / 2.0)])
 
-    def obsrv_cov(z):
+    def obsrv_cov_sqrt(z):
         x, eta = z
         _cov = jnp.array([(1.0 - rho**2) * jnp.exp(x)])
-        return jnp.diag(_cov)
+        return jnp.diag(jnp.sqrt(_cov))
 
-    trans_mdl = ConditionalMVN(trans_mean, trans_cov)
-    obsrv_mdl = ConditionalMVN(obsrv_mean, obsrv_cov)
+    trans_mdl = ConditionalMVNSqrt(trans_mean, trans_cov_sqrt)
+    obsrv_mdl = ConditionalMVNSqrt(obsrv_mean, obsrv_cov_sqrt)
     return trans_mdl, obsrv_mdl

@@ -5,7 +5,8 @@ from jax import closure_convert, custom_vjp, vjp, numpy as jnp
 from jax.flatten_util import ravel_pytree
 from jax.lax import while_loop
 
-from vwf.objects import MVNStandard, MVNSqrt
+from wasserstein_filter.objects import MVNStandard, MVNSqrt
+
 
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
@@ -44,10 +45,10 @@ def wasserstein_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
     X = X_sqrt @ X_sqrt.T
     Y = Y_sqrt @ Y_sqrt.T
 
-    from jax.scipy.linalg import sqrtm
-
+    Y_chol = jnp.linalg.cholesky(Y)
     return jnp.linalg.norm(x - y) ** 2 + jnp.trace(
-        X + Y - 2.0 * sqrtm(sqrtm(Y) @ X @ sqrtm(Y))
+        X + Y
+        - 2.0 * jnp.linalg.cholesky(Y_chol @ X @ Y_chol)
     )
 
 

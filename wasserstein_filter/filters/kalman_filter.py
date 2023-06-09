@@ -5,8 +5,8 @@ import jax.random
 from jax.scipy.linalg import cho_solve
 from jax.scipy.stats import multivariate_normal as mvn
 
-from vwf.objects import MVNStandard, ConditionalMVN
-from vwf.utils import none_or_concat
+from wasserstein_filter.objects import MVNStandard, ConditionalMVN
+from wasserstein_filter.utils import none_or_concat
 
 
 def kalman_filter(

@@ -1,10 +1,10 @@
 import jax
 from jax import numpy as jnp
 
-from vwf.objects import ConditionalMVNSqrt
+from wasserstein_filter.objects import ConditionalMVN
 
 
-def generate_data(key, x0, T, params):
+def generate_data(key, xi, T, params):
     nx, ny = 1, 1
 
     s = params
@@ -12,7 +12,8 @@ def generate_data(key, x0, T, params):
 
     def transition_fcn(key, x):
         _mu = trans_mdl.mean(x)
-        _sigma_sqrt = trans_mdl.cov_sqrt(x)
+        _sigma = trans_mdl.cov(x)
+        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
         xn = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(nx,))
@@ -20,7 +21,8 @@ def generate_data(key, x0, T, params):
 
     def observation_fcn(key, x):
         _mu = obsrv_mdl.mean(x)
-        _sigma_sqrt = obsrv_mdl.cov_sqrt(x)
+        _sigma = obsrv_mdl.cov(x)
+        _sigma_sqrt = jnp.linalg.cholesky(_sigma)
 
         key, sub_key = jax.random.split(key, 2)
         y = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
@@ -34,7 +36,8 @@ def generate_data(key, x0, T, params):
 
     key, sub_key = jax.random.split(key, 2)
 
-    m0, P0_sqrt = x0
+    m0, P0 = xi
+    P0_sqrt = jnp.linalg.cholesky(P0)
     # x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
     x0 = jnp.array([-3.0])
     (key, _), (Xs, Ys) = jax.lax.scan(body, (key, x0), (), length=T)
@@ -49,15 +52,15 @@ def build_model(params):
     def trans_mean(x):
         return x
 
-    def trans_cov_sqrt(x):
+    def trans_cov(x):
         return jnp.eye(1)
 
     def obsrv_mean(x):
         return jnp.abs(x)
 
-    def obsrv_cov_sqrt(x):
-        return jnp.eye(1) * s
+    def obsrv_cov(x):
+        return jnp.eye(1) * s**2
 
-    trans_mdl = ConditionalMVNSqrt(trans_mean, trans_cov_sqrt)
-    obsrv_mdl = ConditionalMVNSqrt(obsrv_mean, obsrv_cov_sqrt)
+    trans_mdl = ConditionalMVN(trans_mean, trans_cov)
+    obsrv_mdl = ConditionalMVN(obsrv_mean, obsrv_cov)
     return trans_mdl, obsrv_mdl

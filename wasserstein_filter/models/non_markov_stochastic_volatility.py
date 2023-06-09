@@ -1,10 +1,10 @@
 import jax
 from jax import numpy as jnp
 
-from vwf.objects import ConditionalMVN
+from wasserstein_filter.objects import ConditionalMVN
 
 
-def generate_data(key, x0, T, params):
+def generate_data(key, xi, T, params):
     nx, ny = 1, 1
 
     mu, a, sig, rho = params
@@ -36,7 +36,7 @@ def generate_data(key, x0, T, params):
 
     key, sub_key = jax.random.split(key, 2)
 
-    m0, P0 = x0
+    m0, P0 = xi
     P0_sqrt = jnp.linalg.cholesky(P0)
     x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
 

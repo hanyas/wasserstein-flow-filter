@@ -1,4 +1,4 @@
-from vwf.objects import MVNSqrt
+from wasserstein_filter.objects import MVNSqrt
 from typing import Tuple, NamedTuple
 
 import math
@@ -8,10 +8,10 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def monte_carlo_points(key, dim, nb_comp, nb_samples):
+def monte_carlo_points(key, dim, nb_samples):
     key, sub_key = jax.random.split(key, 2)
-    rv = jax.random.normal(sub_key, shape=(nb_comp, nb_samples, dim))
-    wm = jnp.ones((nb_comp, nb_samples)) / nb_samples
+    rv = jax.random.normal(sub_key, shape=(nb_samples, dim))
+    wm = jnp.ones((nb_samples, )) / nb_samples
     return key, rv, wm
 
 
