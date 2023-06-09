@@ -11,6 +11,10 @@ from wasserstein_filter.objects import MVNStandard, MVNSqrt
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
+def symmetrize(A):
+    return 0.5 * (A + A.T)
+
+
 def wasserstein_mvn_cond(i, q, p):
     return wasserstein_mvn(q, p) > 1e-8
 
@@ -42,8 +46,8 @@ def wasserstein_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
     x, X_sqrt = q
     y, Y_sqrt = p
 
-    X = X_sqrt @ X_sqrt.T
-    Y = Y_sqrt @ Y_sqrt.T
+    X = symmetrize(X_sqrt @ X_sqrt.T)
+    Y = symmetrize(Y_sqrt @ Y_sqrt.T)
 
     Y_chol = jnp.linalg.cholesky(Y)
     return jnp.linalg.norm(x - y) ** 2 + jnp.trace(
