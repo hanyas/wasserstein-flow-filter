@@ -16,12 +16,12 @@ def kalman_filter(
     observation_model: ConditionalMVN,
 ):
     def _linearize(model, x):
-        mean, cov = model
+        mean_fcn, cov_fcn = model
         m, p = x
 
-        F = jax.jacfwd(mean, 0)(m)
-        b = mean(m) - F @ m
-        Q = cov(m)
+        F = jax.jacfwd(mean_fcn, 0)(m)
+        b = mean_fcn(m) - F @ m
+        Q = mean_fcn(m)
         return F, b, Q
 
     def _predict(F, b, Q, x):

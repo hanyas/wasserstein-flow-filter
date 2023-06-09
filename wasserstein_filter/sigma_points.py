@@ -1,6 +1,3 @@
-from wasserstein_filter.objects import MVNSqrt
-from typing import Tuple, NamedTuple
-
 import math
 
 import jax
