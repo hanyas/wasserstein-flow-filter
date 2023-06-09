@@ -4,7 +4,7 @@ from jax import numpy as jnp
 from wasserstein_filter.objects import ConditionalMVN
 
 
-def generate_data(key, xi, T, params):
+def generate_data(key, prior, length, params):
     nx, ny = 1, 1
 
     mu, a, sig, rho = params
@@ -36,7 +36,7 @@ def generate_data(key, xi, T, params):
 
     key, sub_key = jax.random.split(key, 2)
 
-    m0, P0 = xi
+    m0, P0 = prior
     P0_sqrt = jnp.linalg.cholesky(P0)
     x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
 
@@ -45,7 +45,7 @@ def generate_data(key, xi, T, params):
     _sigma_sqrt = jnp.linalg.cholesky(_sigma)
     y0 = _mu + _sigma_sqrt @ jax.random.normal(sub_key, shape=(ny,))
 
-    (key, _, _), (Xs, Ys) = jax.lax.scan(body, (key, x0, y0), (), length=T - 1)
+    (key, _, _), (Xs, Ys) = jax.lax.scan(body, (key, x0, y0), (), length=length - 1)
 
     Xs = jnp.insert(Xs, 0, x0, 0)
     Ys = jnp.insert(Ys, 0, y0, 0)

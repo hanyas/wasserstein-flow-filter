@@ -4,7 +4,7 @@ from jax import numpy as jnp
 from wasserstein_filter.objects import ConditionalMVNSqrt
 
 
-def generate_data(key, xi, T, params):
+def generate_data(key, prior, length, params):
     nx, ny = 1, 1
 
     s = params
@@ -34,10 +34,10 @@ def generate_data(key, xi, T, params):
 
     key, sub_key = jax.random.split(key, 2)
 
-    m0, P0_sqrt = xi
+    m0, P0_sqrt = prior
     # x0 = m0 + P0_sqrt @ jax.random.normal(sub_key, shape=(nx,))
     x0 = jnp.array([-3.0])
-    (key, _), (Xs, Ys) = jax.lax.scan(body, (key, x0), (), length=T)
+    (key, _), (Xs, Ys) = jax.lax.scan(body, (key, x0), (), length=length)
 
     Xs = jnp.insert(Xs, 0, x0, 0)
     return Xs, Ys
