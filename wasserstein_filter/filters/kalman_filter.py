@@ -17,11 +17,11 @@ def kalman_filter(
 ):
     def _linearize(model, x):
         mean_fcn, cov_fcn = model
-        m, p = x
+        m, _ = x
 
         F = jax.jacfwd(mean_fcn, 0)(m)
         b = mean_fcn(m) - F @ m
-        Q = mean_fcn(m)
+        Q = cov_fcn(m)
         return F, b, Q
 
     def _predict(F, b, Q, x):
@@ -55,7 +55,9 @@ def kalman_filter(
         return (xi, ell + _ell), xi
 
     x0 = initial_dist
-    (_, ell), Xs = jax.lax.scan(body, (x0, 0.0), observations)
+    ys = observations
+
+    (_, ell), Xs = jax.lax.scan(body, (x0, 0.0), xs=ys)
 
     Xs = none_or_concat(Xs, x0, 1)
     return Xs, ell
