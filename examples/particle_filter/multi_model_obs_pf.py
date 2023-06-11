@@ -27,10 +27,11 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(131)
 key, sub_key = jax.random.split(key, 2)
+
+trans_mdl, obsrv_mdl = build_model(s)
 true_states, observations = generate_data(sub_key, init_dist, nb_steps, s)
 
 nb_particles = 500
-trans_mdl, obsrv_mdl = build_model(s)
 filt_states, ell, weights = jax.jit(particle_filter, static_argnums=(1, 4, 5))(
     key, nb_particles, observations, init_dist, trans_mdl, obsrv_mdl
 )

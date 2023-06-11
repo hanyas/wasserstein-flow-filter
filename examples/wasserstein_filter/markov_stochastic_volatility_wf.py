@@ -9,9 +9,9 @@ from wasserstein_filter.models.markov_stochastic_volatility import (
     build_model,
     generate_data,
 )
-
-from wasserstein_filter.sigma_points import cubature_points
-from wasserstein_filter.sigma_points import gauss_hermite_points
+from wasserstein_filter.monte_carlo import monte_carlo_points
+from wasserstein_filter.monte_carlo import cubature_points
+from wasserstein_filter.monte_carlo import gauss_hermite_points
 from wasserstein_filter.utils import euler_odeint
 
 import matplotlib.pyplot as plt
@@ -36,20 +36,26 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(123)
 key, sub_key = jax.random.split(key, 2)
+
+trans_model, obsrv_model = build_model(true_params)
 true_states, observations = generate_data(
     sub_key, init_dist, nb_steps, true_params
 )
 
-# sigma_points = lambda mu, cov_sqrt: cubature_points(mu, cov_sqrt)
-sigma_points = lambda mu, cov_sqrt: gauss_hermite_points(mu, cov_sqrt, order=5)
+# mc_points = lambda key, mu, cov_sqrt: cubature_points(key, mu, cov_sqrt)
+# mc_points = lambda key, mu, cov_sqrt: gauss_hermite_points(key, mu, cov_sqrt, order=5)
+mc_points = lambda key, mu, cov_sqrt: monte_carlo_points(
+    key, mu, cov_sqrt, dim=2, nb_samples=500
+)
 
-trans_model, obsrv_model = build_model(true_params)
-filt_states, ell = jax.jit(wasserstein_filter, static_argnums=(2, 3, 4, 5, 6))(
+key, sub_key = jax.random.split(key, 2)
+filt_states, ell = jax.jit(wasserstein_filter, static_argnums=(3, 4, 5, 6, 7))(
+    sub_key,
     observations,
     init_dist,
     trans_model,
     obsrv_model,
-    sigma_points,
+    mc_points,
     euler_odeint,
     step_size=1e-2,
 )
