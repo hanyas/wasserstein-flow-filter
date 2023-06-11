@@ -9,8 +9,7 @@ from wasserstein_filter.models.multi_modal_obs_sqrt import (
     build_model,
     generate_data,
 )
-
-from wasserstein_filter.sigma_points import monte_carlo_points
+from wasserstein_filter.numerics import gmm_monte_carlo_points
 from wasserstein_filter.utils import euler_odeint
 
 import matplotlib.pyplot as plt
@@ -30,25 +29,22 @@ nb_steps = 500
 
 key = jax.random.PRNGKey(131)
 key, sub_key = jax.random.split(key, 2)
+
+trans_model, obsrv_model = build_model(s)
 true_states, observations = generate_data(sub_key, init_dist, nb_steps, s)
 
 nb_comp = 2
 nb_samples = 500
 
-
-def mc_points(key):
-    _sub_keys = jax.random.split(key, nb_comp + 1)
-    return _sub_keys[0], jax.vmap(monte_carlo_points, in_axes=(0, None, None))(
-        _sub_keys[1:], 1, nb_samples
-    )
-
+mc_points = lambda key, mus, covs_sqrt: gmm_monte_carlo_points(
+    key, mus, covs_sqrt, nb_comp, 1, nb_samples
+)
 
 init_gmm = GMMSqrt(
     jnp.array([[-5.0], [5.0]]),
     jnp.repeat(P0_sqrt[None, :], nb_comp, axis=0),
 )
 
-trans_model, obsrv_model = build_model(s)
 
 key, sub_key = jax.random.split(key, 2)
 filt_states, ell = jax.jit(

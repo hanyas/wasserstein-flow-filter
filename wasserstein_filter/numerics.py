@@ -5,6 +5,13 @@ import jax.numpy as jnp
 import numpy as np
 
 
+def gmm_monte_carlo_points(key, mus, covs_sqrt, nb_comp, dim, nb_samples):
+    rv = jax.random.normal(key, shape=(nb_comp, nb_samples, dim))
+    ps = mus[:, None, :] + jnp.einsum("kij,knj->kni", covs_sqrt, rv)
+    wm = jnp.ones((nb_comp, nb_samples, )) / nb_samples
+    return ps, wm
+
+
 def monte_carlo_points(key, mu, cov_sqrt, dim, nb_samples):
     rv = jax.random.normal(key, shape=(nb_samples, dim))
     ps = mu[None, :] + jnp.einsum("ij,nj->ni", cov_sqrt, rv)

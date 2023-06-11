@@ -9,7 +9,7 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import multivariate_normal as mvn
 
 from wasserstein_filter.objects import GMMSqrt, ConditionalMVNSqrt
-from wasserstein_filter.utils import fixed_point, rk4_odeint, euler_odeint
+from wasserstein_filter.utils import euler_odeint
 from wasserstein_filter.utils import tria_qr, tria_tril
 from wasserstein_filter.utils import none_or_concat
 
@@ -57,8 +57,8 @@ def ode_step(
     prior_sqrt: GMMSqrt,
     observation: jnp.ndarray,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo: Callable,
-    integrator: Callable,
+    monte_carlo_points: Callable,
+    ode_integrator: Callable,
     step_size: float,
 ):
     d = dist_sqrt.dim
@@ -76,12 +76,12 @@ def ode_step(
 
     _dist_sqrt, _unflatten = ravel_pytree(dist_sqrt)
 
-    key, (rvs, ws) = monte_carlo(key)
+    key, sub_key = jax.random.split(key, 2)
 
     def _ode(t, x):
         mus, sigmas_sqrt = _unflatten(x)
 
-        zs = mus[:, None, :] + jnp.einsum("kij,knj->kni", sigmas_sqrt, rvs)
+        zs, ws = monte_carlo_points(sub_key, mus, sigmas_sqrt)
 
         def _grad_fcn(zs, mus, sigmas_sqrt):
             return jax.vmap(gradP, in_axes=(0, None, None))(
@@ -110,7 +110,7 @@ def ode_step(
         dx_dt = GMMSqrt(mus_dt, sigmas_sqrt_dt)
         return ravel_pytree(dx_dt)[0]
 
-    _dist_sqrt = integrator(func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
+    _dist_sqrt = ode_integrator(func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
     return key, _unflatten(_dist_sqrt)
 
 
@@ -119,25 +119,26 @@ def integrate_ode(
     prior_sqrt: GMMSqrt,
     observation: jnp.ndarray,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo: Callable,
-    integrator: Callable,
+    monte_carlo_points: Callable,
+    ode_integrator: Callable,
     step_size: float,
-    criterion: Callable,
+    nb_iter: int
 ):
-    def fun_to_iter(args):
-        key, dist_sqrt = args
+    def fun_to_iter(carry, args):
+        key, dist_sqrt = carry
+        _ = args
         return ode_step(
             key,
             dist_sqrt,
             prior_sqrt,
             observation,
             observation_model,
-            monte_carlo,
-            integrator,
+            monte_carlo_points,
+            ode_integrator,
             step_size,
-        )
+        ), _
 
-    return fixed_point(fun_to_iter, (key, prior_sqrt), criterion)
+    return jax.lax.scan(fun_to_iter, (key, prior_sqrt), xs=jnp.arange(nb_iter))[0]
 
 
 def wasserstein_filter_sqrt_gmm(
@@ -146,10 +147,10 @@ def wasserstein_filter_sqrt_gmm(
     initial_dist: GMMSqrt,
     transition_model: ConditionalMVNSqrt,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo: Callable,
-    integrator: Callable = euler_odeint,
+    monte_carlo_points: Callable,
+    ode_integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
-    stopping_criterion: Callable = lambda i, *_: i < 500,
+    nb_iter: int = 500
 ):
     def body(carry, args):
         key, x, ell = carry
@@ -165,16 +166,16 @@ def wasserstein_filter_sqrt_gmm(
             xp,
             y,
             observation_model,
-            monte_carlo,
-            integrator,
+            monte_carlo_points,
+            ode_integrator,
             step_size,
-            stopping_criterion,
+            nb_iter,
         )
 
         # ell
         mus, sigmas_sqrt = xp
-        key, (rvs, ws) = monte_carlo(key)
-        zs = mus[:, None, :] + jnp.einsum("kij,knj->kni", sigmas_sqrt, rvs)
+        key, sub_key = jax.random.split(key, 2)
+        zs, ws = monte_carlo_points(sub_key, mus, sigmas_sqrt)
 
         def _ell(z, w):
             _log_pdfs = jax.vmap(observation_model.logpdf, in_axes=(0, None))(z, y)
