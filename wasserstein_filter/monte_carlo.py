@@ -5,13 +5,14 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def monte_carlo_points(key, dim, nb_samples):
+def monte_carlo_points(key, mu, cov_sqrt, dim, nb_samples):
     rv = jax.random.normal(key, shape=(nb_samples, dim))
+    ps = mu[None, :] + jnp.einsum("ij,nj->ni", cov_sqrt, rv)
     wm = jnp.ones((nb_samples, )) / nb_samples
-    return rv, wm
+    return ps, wm
 
 
-def cubature_points(mu, cov_sqrt):
+def cubature_points(key, mu, cov_sqrt):
     n_dim = mu.shape[0]
     xi, wm = _cubature_weights(n_dim)
     p = mu[None, :] + jnp.dot(cov_sqrt, xi.T).T
@@ -24,7 +25,7 @@ def _cubature_weights(n_dim: int):
     return xi, wm
 
 
-def gauss_hermite_points(mu, cov_sqrt, order: int):
+def gauss_hermite_points(key, mu, cov_sqrt, order: int):
     n_dim = mu.shape[0]
     xi, wm = _gauss_hermite_weights(n_dim, order)
     p = mu[None, :] + math.sqrt(2) * (cov_sqrt @ xi).T

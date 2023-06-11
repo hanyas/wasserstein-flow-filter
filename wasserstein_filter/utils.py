@@ -89,16 +89,16 @@ def kullback_leibler_mvn_sqrt(q: MVNSqrt, p: MVNSqrt):
     )
 
 
-def rk4_odeint(func, tk, yk, dt, **kwargs):
-    f1 = func(tk, yk, **kwargs)
-    f2 = func(tk + dt / 2.0, yk + (f1 * (dt / 2.0)), **kwargs)
-    f3 = func(tk + dt / 2.0, yk + (f2 * (dt / 2.0)), **kwargs)
-    f4 = func(tk + dt, yk + (f3 * dt), **kwargs)
+def rk4_odeint(key, func, tk, yk, dt):
+    f1 = func(key, tk, yk)
+    f2 = func(key, tk + dt / 2.0, yk + (f1 * (dt / 2.0)))
+    f3 = func(key, tk + dt / 2.0, yk + (f2 * (dt / 2.0)))
+    f4 = func(key, tk + dt, yk + (f3 * dt))
     return yk + (dt / 6.0) * (f1 + (2.0 * f2) + (2.0 * f3) + f4)
 
 
-def euler_odeint(func, tk, yk, dt, **kwargs):
-    return yk + dt * func(tk, yk, **kwargs)
+def euler_odeint(key, func, tk, yk, dt):
+    return yk + dt * func(key, tk, yk)
 
 
 def fixed_point(f, x0, criterion):
