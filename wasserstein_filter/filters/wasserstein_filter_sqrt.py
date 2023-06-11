@@ -44,12 +44,11 @@ def log_posterior(
 
 
 def ode_step(
-    key: jax.random.PRNGKey,
     dist_sqrt: MVNSqrt,
     prior_sqrt: MVNSqrt,
     observation: jnp.ndarray,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo_points: Callable,
+    sigma_points: Callable,
     ode_integrator: Callable,
     step_size: float,
 ):
@@ -58,10 +57,10 @@ def ode_step(
 
     _dist_sqrt, _unflatten = ravel_pytree(dist_sqrt)
 
-    def _ode(key, t, x):
+    def _ode(t, x):
         mu, sigma_sqrt = _unflatten(x)
 
-        z, w = monte_carlo_points(key, mu, sigma_sqrt)
+        z, w = sigma_points(mu, sigma_sqrt)
         dP = jax.vmap(gradP, in_axes=(0, None, None, None))(
             z, observation, prior_sqrt, observation_model
         )
@@ -82,16 +81,15 @@ def ode_step(
         dx_dt = MVNSqrt(mu_dt, sigma_sqrt_dt)
         return ravel_pytree(dx_dt)[0]
 
-    _dist_sqrt = ode_integrator(key=key, func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
+    _dist_sqrt = ode_integrator(func=_ode, tk=0.0, yk=_dist_sqrt, dt=step_size)
     return _unflatten(_dist_sqrt)
 
 
 def integrate_ode(
-    key: jax.random.PRNGKey,
     prior_sqrt: MVNSqrt,
     observation: jnp.ndarray,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo_points: Callable,
+    sigma_points: Callable,
     ode_integrator: Callable,
     step_size: float,
     criterion: Callable,
@@ -99,12 +97,11 @@ def integrate_ode(
 
     def fun_to_iter(dist_sqrt):
         return ode_step(
-            key,
             dist_sqrt,
             prior_sqrt,
             observation,
             observation_model,
-            monte_carlo_points,
+            sigma_points,
             ode_integrator,
             step_size,
         )
@@ -113,19 +110,18 @@ def integrate_ode(
 
 
 def wasserstein_filter_sqrt(
-    key: jax.random.PRNGKey,
     observations: jnp.ndarray,
     initial_dist: MVNSqrt,
     transition_model: ConditionalMVNSqrt,
     observation_model: ConditionalMVNSqrt,
-    monte_carlo_points: Callable,
+    sigma_points: Callable,
     ode_integrator: Callable = euler_odeint,
     step_size: float = 1e-2,
     stopping_criterion: Callable = lambda i, *_: i < 500,
 ):
     def body(carry, args):
         x, ell = carry
-        y, key = args
+        y = args
 
         # predict
         F, b, Q_sqrt = linearize(transition_model, x)
@@ -133,11 +129,10 @@ def wasserstein_filter_sqrt(
 
         # innovate
         xf = integrate_ode(
-            key,
             xp,
             y,
             observation_model,
-            monte_carlo_points,
+            sigma_points,
             ode_integrator,
             step_size,
             stopping_criterion,
@@ -145,7 +140,7 @@ def wasserstein_filter_sqrt(
 
         # ell
         mu, sigma_sqrt = xp
-        z, w = monte_carlo_points(key, mu, sigma_sqrt)
+        z, w = sigma_points(mu, sigma_sqrt)
         log_pdfs = jax.vmap(observation_model.logpdf, in_axes=(0, None))(z, y)
         ell += jnp.log(jnp.average(jnp.exp(log_pdfs), weights=w))
 
@@ -153,8 +148,7 @@ def wasserstein_filter_sqrt(
 
     x0 = initial_dist
     ys = observations
-    keys = jax.random.split(key, ys.shape[0])
 
-    (_, ell), Xf = jax.lax.scan(body, (x0, 0.0), xs=(ys, keys))
+    (_, ell), Xf = jax.lax.scan(body, (x0, 0.0), xs=ys)
     Xf = none_or_concat(Xf, x0, 1)
     return Xf, ell
